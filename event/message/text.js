@@ -23,6 +23,15 @@ export const textEvent = async (event, client) => {
       };
       break;
     }
+    //'こんばんは'というメッセージが送られてきた時
+    case 'こんばんは': {
+      // 返信するメッセージを作成
+      message = {
+        type: 'text',
+        text: 'こんばんは〜',
+      };
+      break;
+    }
     // '複数メッセージ'というメッセージが送られてきた時
     case '複数メッセージ': {
       // 返信するメッセージを作成
