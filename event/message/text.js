@@ -9,7 +9,7 @@ export const textEvent = async (event, client) => {
       // 返信するメッセージを作成
       message = {
         type: 'text',
-        text: '朝だよ。寝ろ！',
+        text: '朝だよ。お布団が待ってる！',
       };
       break;
     }
