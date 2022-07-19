@@ -3,7 +3,13 @@ export const textEvent = async (event, client) => {
   let message;
   // メッセージのテキストごとに条件分岐
   switch (event.message.text) {
-
+    case 'a': {
+      message = {
+        type: 'text',
+        text: 'a!',
+      };
+      break;
+    }
     // 'おはよう'というメッセージが送られてきた時
     case 'おはよう': {
       // 返信するメッセージを作成
@@ -23,7 +29,7 @@ export const textEvent = async (event, client) => {
       };
       break;
     }
-    //'こんばんは'というメッセージが送られてきた時
+    // 'こんばんは'というメッセージが送られてきた時
     case 'こんばんは': {
       // 返信するメッセージを作成
       message = {
