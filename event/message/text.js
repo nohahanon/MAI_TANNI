@@ -1,8 +1,21 @@
+import axios from 'axios';
 // テキストメッセージの処理をする関数
 export const textEvent = async (event, client) => {
   let message;
   // メッセージのテキストごとに条件分岐
   switch (event.message.text) {
+    case 'カレンダー': {
+      const CalURL = 'https://elms.u-aizu.ac.jp/calendar/export_execute.php?userid=7036&authtoken=5452f0d36e1588eea23916f2729a31039ec10841&preset_what=all&preset_time=weeknow';
+      await axios.get(CalURL)
+        .then((response) => {
+          message = {
+            type: 'text',
+            text: `${response.data}`,
+          };
+        })
+        .catch((err) => console.log(err));
+      break;
+    }
     case 'a': {
       message = {
         type: 'text',
