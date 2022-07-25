@@ -20,8 +20,6 @@ async function processCalender(url) {
   await axios.get(url)
     .then((response) => {
       const data = Object.values(ical.parseICS(response.data));
-      console.log(data);
-      // 以下テスト
       pool.query({
         text: 'INSERT INTO submission () VALUES ();',
         values: [],
