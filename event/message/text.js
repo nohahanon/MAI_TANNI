@@ -1,8 +1,37 @@
 import { JsonDB } from 'node-json-db';
 import { Config } from 'node-json-db/dist/lib/JsonDBConfig.js';
 
+import axios from 'axios';
+import ical from 'ical';
+import Pool from 'pg-pool';
+
 const urlDB = new JsonDB(new Config('db/urlDB.json', true, true, '/'));
 const memoDB = new JsonDB(new Config('db/memoDB.json', true, true, '/'));
+
+const pool = new Pool({
+  user: process.env.pgUser,
+  host: process.env.pgHost,
+  database: process.env.pgDatabase,
+  password: process.env.pgPassWord,
+  port: process.env.pgPort,
+});
+
+// pool.query('SELECT NOW()', (err, res) => {
+//   console.log(err, res);
+//   pool.end();
+// });
+
+async function processCalender(url) {
+  await axios.get(url)
+    .then((response) => {
+      const data = Object.values(ical.parseICS(response.data));
+      pool.query({
+        text: 'INSERT INTO submission () VALUES ();',
+        values: [],
+      });
+    })
+    .catch((err) => console.log(err));
+}
 
 // テキストメッセージの処理をする関数
 export const textEvent = async (event, client) => {
@@ -56,6 +85,11 @@ export const textEvent = async (event, client) => {
       break;
     }
 
+    // case 'データベーステスト': {
+    //   processCalender('https://elms.u-aizu.ac.jp/calendar/export_execute.php?userid=7036&authtoken=5452f0d36e1588eea23916f2729a31039ec10841&preset_what=all&preset_time=weeknow');
+    //   break;
+    // }
+    
     // 'おはよう'というメッセージが送られてきた時
     case 'おはよう': {
       // 返信するメッセージを作成
