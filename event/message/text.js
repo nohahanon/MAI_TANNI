@@ -1,7 +1,12 @@
-/* eslint-disable linebreak-style */
+import { JsonDB } from 'node-json-db';
+import { Config } from 'node-json-db/dist/lib/JsonDBConfig.js';
+
 import axios from 'axios';
 import ical from 'ical';
 import Pool from 'pg-pool';
+
+const urlDB = new JsonDB(new Config('db/urlDB.json', true, true, '/'));
+const memoDB = new JsonDB(new Config('db/memoDB.json', true, true, '/'));
 
 const pool = new Pool({
   user: process.env.pgUser,
@@ -30,19 +35,67 @@ async function processCalender(url) {
 
 // テキストメッセージの処理をする関数
 export const textEvent = async (event, client) => {
+  let contexturl;
+  let urlData;
+  // userIdの取得
+  const { userId } = event.source;
+  // url入れにくるためのやつ
+  try {
+    contexturl = urlDB.getData(`/${userId}/context`);
+  } catch (_) {
+    contexturl = undefined;
+  }
+  try { // url入れるための場所
+    urlData = memoDB.getData(`/${userId}/memo`);
+  } catch (_) {
+    urlData = undefined;
+  }
+  switch (contexturl) {
+    case 'urlpush': {
+      if (urlData) {
+        memoDB.delete(`/${userId}/memo`);
+        urlData.push(event.message.text);
+        memoDB.push(`/${userId}/memo`, urlData);
+      } else {
+        memoDB.push(`/${userId}/memo`, [event.message.text]);
+      }
+      urlDB.delete(`/${userId}/context`);
+
+      return {
+        type: 'text',
+        text: 'URLを更新しました',
+      };
+    }
+    default:
+      break;
+  }
+
   let message;
   // メッセージのテキストごとに条件分岐
   switch (event.message.text) {
+    // URLの取得
+    case 'URL': {
+      // URLを入力させる
+      message = {
+        type: 'text',
+        text: 'URLを入力してください。',
+      };
+      // 次の文章でurl入力するところに飛ぶ
+      urlDB.push(`/${userId}/context`, 'urlpush');
+      break;
+    }
+
     // case 'データベーステスト': {
     //   processCalender('https://elms.u-aizu.ac.jp/calendar/export_execute.php?userid=7036&authtoken=5452f0d36e1588eea23916f2729a31039ec10841&preset_what=all&preset_time=weeknow');
     //   break;
     // }
+    
     // 'おはよう'というメッセージが送られてきた時
     case 'おはよう': {
       // 返信するメッセージを作成
       message = {
         type: 'text',
-        text: '朝だよ。寝ろ！',
+        text: '朝だよ。お布団が待ってる！',
       };
       break;
     }

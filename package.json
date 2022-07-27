@@ -19,6 +19,7 @@
     "ical-date-parser": "^4.0.0",
     "ics": "^2.37.0",
     "ngrok": "^4.3.1",
+    "node-json-db": "^1.6.0",
     "nodemon": "^2.0.16",
     "pg": "^8.7.3",
     "pg-pool": "^3.5.1",
