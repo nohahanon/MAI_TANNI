@@ -1,8 +1,60 @@
+import { JsonDB } from 'node-json-db';
+import { Config } from 'node-json-db/dist/lib/JsonDBConfig.js';
+
+const urlDB = new JsonDB(new Config('db/urlDB.json', true, true, '/'));
+const memoDB = new JsonDB(new Config('db/memoDB.json', true, true, '/'));
+
 // テキストメッセージの処理をする関数
 export const textEvent = async (event, client) => {
+  let contexturl;
+  let urlData;
+  // userIdの取得
+  const { userId } = event.source;
+  // url入れにくるためのやつ
+  try {
+    contexturl = urlDB.getData(`/${userId}/context`);
+  } catch (_) {
+    contexturl = undefined;
+  }
+  try { // url入れるための場所
+    urlData = memoDB.getData(`/${userId}/memo`);
+  } catch (_) {
+    urlData = undefined;
+  }
+  switch (contexturl) {
+    case 'urlpush': {
+      if (urlData) {
+        memoDB.delete(`/${userId}/memo`);
+        urlData.push(event.message.text);
+        memoDB.push(`/${userId}/memo`, urlData);
+      } else {
+        memoDB.push(`/${userId}/memo`, [event.message.text]);
+      }
+      urlDB.delete(`/${userId}/context`);
+
+      return {
+        type: 'text',
+        text: 'URLを更新しました',
+      };
+    }
+    default:
+      break;
+  }
+
   let message;
   // メッセージのテキストごとに条件分岐
   switch (event.message.text) {
+    // URLの取得
+    case 'URL': {
+      // URLを入力させる
+      message = {
+        type: 'text',
+        text: 'URLを入力してください',
+      };
+      // 次の文章でurl入力するところに飛ぶ
+      urlDB.push(`/${userId}/context`, 'urlpush');
+      break;
+    }
 
     // 'おはよう'というメッセージが送られてきた時
     case 'おはよう': {
@@ -23,7 +75,7 @@ export const textEvent = async (event, client) => {
       };
       break;
     }
-    //'こんばんは'というメッセージが送られてきた時
+    // 'こんばんは'というメッセージが送られてきた時
     case 'こんばんは': {
       // 返信するメッセージを作成
       message = {
