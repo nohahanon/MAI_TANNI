@@ -26,8 +26,8 @@ async function processCalender(url) {
     .then((response) => {
       const data = Object.values(ical.parseICS(response.data));
       pool.query({
-        text: 'INSERT INTO submission () VALUES ();',
-        values: [],
+        text: 'INSERT INTO submission (name) VALUES ($1);',
+        values: [data[0].summary],
       });
     })
     .catch((err) => console.log(err));
@@ -85,11 +85,12 @@ export const textEvent = async (event, client) => {
       break;
     }
 
-    // case 'データベーステスト': {
-    //   processCalender('https://elms.u-aizu.ac.jp/calendar/export_execute.php?userid=7036&authtoken=5452f0d36e1588eea23916f2729a31039ec10841&preset_what=all&preset_time=weeknow');
-    //   break;
-    // }
-    
+    case 'データベーステスト': {
+      let str = JSON.stringify(urlData).slice(2);
+      str = str.slice(0, -2);
+      processCalender(str);
+      break;
+    }
     // 'おはよう'というメッセージが送られてきた時
     case 'おはよう': {
       // 返信するメッセージを作成
