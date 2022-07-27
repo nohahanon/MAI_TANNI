@@ -49,7 +49,7 @@ export const textEvent = async (event, client) => {
       // URLを入力させる
       message = {
         type: 'text',
-        text: 'URLを入力してください',
+        text: 'URLを入力してください。',
       };
       // 次の文章でurl入力するところに飛ぶ
       urlDB.push(`/${userId}/context`, 'urlpush');
