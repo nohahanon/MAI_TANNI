@@ -92,7 +92,7 @@ export const textEvent = async (event, client) => {
       break;
     }
 
-    // urlData[0]に受け取っているurl文字列が格納されているのでそれをpeocessCalender()に渡してinsertを実行する
+    // urlDataに受け取っているurl文字列が格納されているのでそれをpeocessCalender()に渡してinsertを実行する
     case 'データベーステスト': {
       processCalender(urlData);
       break;
