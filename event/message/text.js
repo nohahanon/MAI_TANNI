@@ -16,19 +16,23 @@ const pool = new Pool({
   port: process.env.pgPort,
 });
 
-// pool.query('SELECT NOW()', (err, res) => {
-//   console.log(err, res);
-//   pool.end();
-// });
-
 async function processCalender(url) {
   await axios.get(url)
     .then((response) => {
+      // ical.parseICS()でurlを元にgetしたics文字配列をオブジェクトに変換します
+      // ブラケット記法で簡単にアクセスできなかったのでそれをObject.values()に渡してdata[0]のようにアクセスできるようにしました
+      // pool.query()で設定したdbのテーブルとそのデータにアクセスできます。以下のようにオブジェクトとして命令を渡します。
       const data = Object.values(ical.parseICS(response.data));
-      pool.query({
-        text: 'INSERT INTO submission (name) VALUES ($1);',
-        values: [data[0].summary],
-      });
+      // tableに対して行う処理
+      // 1.新しいデータの挿入(submissionsへ)
+      // 2.重複データの挿入はしない
+      for (let i = 0; i < data.length; i += 1) {
+        pool.query({
+          text: 'INSERT INTO submissions (submissionid, submissioncontext, deadline, name) VALUES ($1, $2, $3, $4);',
+          values: [],
+        });
+        // 2022-07-28 21:36:18.708964+09 select now();でこの形式を得る
+      }
     })
     .catch((err) => console.log(err));
 }
@@ -39,28 +43,31 @@ export const textEvent = async (event, client) => {
   let urlData;
   // userIdの取得
   const { userId } = event.source;
-  // url入れにくるためのやつ
+  // url入れにくるためのやつ コンテキスト管理
   try {
     contexturl = urlDB.getData(`/${userId}/context`);
   } catch (_) {
     contexturl = undefined;
   }
-  try { // url入れるための場所
+  // url入れるための場所
+  try {
     urlData = memoDB.getData(`/${userId}/memo`);
   } catch (_) {
     urlData = undefined;
   }
+
+  // contexturlの値で区別する。getData()で値が返ってきていなかったらdefault行き。
   switch (contexturl) {
     case 'urlpush': {
+      // urlDataにgetData()で値が返ってきているかどうかで区別する。
       if (urlData) {
         memoDB.delete(`/${userId}/memo`);
-        urlData.push(event.message.text);
+        urlData = event.message.text;
         memoDB.push(`/${userId}/memo`, urlData);
       } else {
         memoDB.push(`/${userId}/memo`, [event.message.text]);
       }
       urlDB.delete(`/${userId}/context`);
-
       return {
         type: 'text',
         text: 'URLを更新しました',
@@ -80,15 +87,14 @@ export const textEvent = async (event, client) => {
         type: 'text',
         text: 'URLを入力してください。',
       };
-      // 次の文章でurl入力するところに飛ぶ
+      // 次の文章でコンテキストを元に戻してurlをmemoDB.jsonにurlを追加する
       urlDB.push(`/${userId}/context`, 'urlpush');
       break;
     }
 
+    // urlData[0]に受け取っているurl文字列が格納されているのでそれをpeocessCalender()に渡してinsertを実行する
     case 'データベーステスト': {
-      let str = JSON.stringify(urlData).slice(2);
-      str = str.slice(0, -2);
-      processCalender(str);
+      processCalender(urlData);
       break;
     }
     // 'おはよう'というメッセージが送られてきた時
