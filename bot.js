@@ -1,6 +1,10 @@
 // モジュール読み込み
 import line from '@line/bot-sdk';
 import crypto from 'crypto';
+
+// pgのためのモジュール読み込み
+import Pool from 'pg-pool';
+
 // 各イベントごとの処理をするファイルの読み込み
 import messageFunc from './event/message.js';
 import unsendFunc from './event/unsend.js';
@@ -11,6 +15,15 @@ import followFunc from './event/follow.js';
 import unfollowFunc from './event/unfollow.js';
 import memberJoinedFunc from './event/memberJoined.js';
 import memberLeftFunc from './event/memberLeft.js';
+
+
+const pool = new Pool({
+  user: process.env.pgUser,
+  host: process.env.pgHost,
+  database: process.env.pgDatabase,
+  password: process.env.pgPassWord,
+  port: process.env.pgPort,
+});
 
 const client = new line.Client({
   channelAccessToken: process.env.channelAccessToken,
@@ -62,12 +75,20 @@ export const index = (req, res) => {
         case 'follow': {
           // フォローイベントが飛んできた時はfollow.jsのindexを呼び出す
           message = followFunc();
+          pool.query({
+            text: 'INSERT INTO users (LINEID) VALUES ($1::char);',
+            values: [event.sorce.userId],
+          });
           break;
         }
         case 'unfollow': {
           // フォロー解除イベントが飛んできた時はunfollow.jsのindexを呼び出す
           // 処理結果をmessageに格納
           unfollowFunc(event);
+          pool.query({
+            text: 'DELETE FROM users WHERE LINEID = $1::char',
+            values: [event.sorce.userId],
+          });
           break;
         }
         case 'memberJoined': {

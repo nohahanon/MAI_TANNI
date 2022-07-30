@@ -1,3 +1,5 @@
+/* eslint-disable no-return-assign */
+/* eslint-disable camelcase */
 import { JsonDB } from 'node-json-db';
 import { Config } from 'node-json-db/dist/lib/JsonDBConfig.js';
 
@@ -16,51 +18,76 @@ const pool = new Pool({
   port: process.env.pgPort,
 });
 
-// pool.query('SELECT NOW()', (err, res) => {
-//   console.log(err, res);
-//   pool.end();
-// });
-
-async function processCalender(url) {
-  await axios.get(url)
-    .then((response) => {
-      const data = Object.values(ical.parseICS(response.data));
-      pool.query({
-        text: 'INSERT INTO submission (name) VALUES ($1);',
-        values: [data[0].summary],
-      });
-    })
-    .catch((err) => console.log(err));
+// data[].endに格納されている時間をsql用に成型します
+function convertZuluToJST(zulu) {
+  const date = JSON.stringify(zulu).split('T');
+  const date1 = date[0].slice(1);
+  const date2 = date[1].split('.')[0];
+  const date3 = date2.split(':');
+  const date4 = (Number(JSON.stringify(date3[0]).slice(1, -1)) + 9) % 24;
+  return `${date1} ${date4}:${date3[1]}:${date3[2]}`;
 }
 
+async function processCalender(url, LINEID) {
+  try {
+    const response = await axios.get(url);
+    // urlからデータを取得しdbにinsertします
+    // データ取得
+    const data = Object.values(ical.parseICS(response.data));
+    // dbにおけるuserIdの取得
+    const res = await pool.query({
+      text: 'SELECT userID FROM Users WHERE lineID = $1',
+      values: [LINEID],
+    });
+    // insert処理
+    const USERID = res.rows[0].userid;
+    if (USERID === undefined) throw Error;
+    for (let i = 0; i < data.length; i += 1) {
+      // submissionの更新
+      pool.query({
+        text: 'INSERT INTO submissions (lectureCode, deadline, name, userID) VALUES ($1, TO_TIMESTAMP($2, $3), $4, $5);',
+        values: [data[i].categories[0].split('_')[0], convertZuluToJST(data[i].end), 'YYYY-MM-DD T1:MI:SS', data[i].summary, USERID],
+      });
+      // userslecturesの更新
+      // 知らない組み合わせを得たら更新する
+      pool.query({
+        text: 'INSERT INTO UsersLectures SELECT $1, $2 WHERE NOT EXISTS (SELECT * FROM UsersLectures WHERE userID = $1 AND lectureCode = $2)',
+        values: [USERID, data[i].categories[0].split('_')[0]],
+      });
+    }
+  } catch (err) { console.log(err); }
+}
 // テキストメッセージの処理をする関数
 export const textEvent = async (event, client) => {
   let contexturl;
   let urlData;
   // userIdの取得
   const { userId } = event.source;
-  // url入れにくるためのやつ
+  // url入れにくるためのやつ コンテキスト管理
   try {
     contexturl = urlDB.getData(`/${userId}/context`);
   } catch (_) {
     contexturl = undefined;
   }
-  try { // url入れるための場所
+  // url入れるための場所
+  try {
     urlData = memoDB.getData(`/${userId}/memo`);
   } catch (_) {
     urlData = undefined;
   }
+
+  // contexturlの値で区別する。getData()で値が返ってきていなかったらdefault行き。
   switch (contexturl) {
     case 'urlpush': {
+      // urlDataにgetData()で値が返ってきているかどうかで区別する。
       if (urlData) {
         memoDB.delete(`/${userId}/memo`);
-        urlData.push(event.message.text);
+        urlData = event.message.text;
         memoDB.push(`/${userId}/memo`, urlData);
       } else {
         memoDB.push(`/${userId}/memo`, [event.message.text]);
       }
       urlDB.delete(`/${userId}/context`);
-
       return {
         type: 'text',
         text: 'URLを更新しました',
@@ -80,15 +107,14 @@ export const textEvent = async (event, client) => {
         type: 'text',
         text: 'URLを入力してください。',
       };
-      // 次の文章でurl入力するところに飛ぶ
+      // 次の文章でコンテキストを元に戻してurlをmemoDB.jsonにurlを追加する
       urlDB.push(`/${userId}/context`, 'urlpush');
       break;
     }
 
+    // urlDataに受け取っているurl文字列が格納されているのでそれをpeocessCalender()に渡してinsertを実行する
     case 'データベーステスト': {
-      let str = JSON.stringify(urlData).slice(2);
-      str = str.slice(0, -2);
-      processCalender(str);
+      processCalender(urlData, userId);
       break;
     }
     // 'おはよう'というメッセージが送られてきた時
