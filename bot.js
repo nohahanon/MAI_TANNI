@@ -76,7 +76,7 @@ export const index = (req, res) => {
           // フォローイベントが飛んできた時はfollow.jsのindexを呼び出す
           message = followFunc();
           pool.query({
-            text: 'INSERT INTO users (LINEID) VALUES ($1::char);',
+            text: 'INSERT INTO users (lineID) VALUES ($1::char);',
             values: [event.sorce.userId],
           });
           break;
@@ -86,7 +86,7 @@ export const index = (req, res) => {
           // 処理結果をmessageに格納
           unfollowFunc(event);
           pool.query({
-            text: 'DELETE FROM users WHERE LINEID = $1::char',
+            text: 'DELETE FROM users WHERE lineID = $1::char',
             values: [event.sorce.userId],
           });
           break;
