@@ -28,50 +28,74 @@ function convertZuluToJST(zulu) {
   return `${date1} ${date4}:${date3[1]}:${date3[2]}`;
 }
 
-async function processCalender(url, LINEID) {
+// lineIDからuserIDを取得する関数
+async function lineID_To_userID(lineID) {
+  try {
+    const res = await pool.query({
+      text: 'SELECT userID FROM Users WHERE lineID = $1',
+      values: [lineID],
+    });
+    return await res.rows[0].userid;
+  } catch (err) {
+    console.log('\n\n\n\n\n\n\n\n\n\n', err);
+    return undefined;
+  }
+}
+
+// submissionsから一覧を取得して表示する文字列を返す関数
+async function displaySubmissionList(lineID) {
+  const userID = await lineID_To_userID(lineID);
+  const res = await pool.query({
+    text: 'SELECT name, lectureCode FROM submissions WHERE userID = $1',
+    values: [userID],
+  });
+  let buf = '';
+  for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
+  return buf;
+}
+
+// urlからicsデータを取得しdbにinsertする関数
+async function processCalender(url, lineID) {
   try {
     const response = await axios.get(url);
-    // urlからデータを取得しdbにinsertします
     // データ取得
     const data = Object.values(ical.parseICS(response.data));
     // dbにおけるuserIdの取得
-    const res = await pool.query({
-      text: 'SELECT userID FROM Users WHERE lineID = $1',
-      values: [LINEID],
-    });
+    const userID = lineID_To_userID(lineID);
+    if (userID === undefined) throw Error;
     // insert処理
-    const USERID = res.rows[0].userid;
-    if (USERID === undefined) throw Error;
+    // db(submissionsとUsersLectures)の更新
     for (let i = 0; i < data.length; i += 1) {
       // submissionの更新
       pool.query({
         text: 'INSERT INTO submissions (lectureCode, deadline, name, userID) VALUES ($1, TO_TIMESTAMP($2, $3), $4, $5);',
-        values: [data[i].categories[0].split('_')[0], convertZuluToJST(data[i].end), 'YYYY-MM-DD T1:MI:SS', data[i].summary, USERID],
+        values: [data[i].categories[0].split('_')[0], convertZuluToJST(data[i].end), 'YYYY-MM-DD T1:MI:SS', data[i].summary, userID],
       });
       // userslecturesの更新
       // 知らない組み合わせを得たら更新する
       pool.query({
         text: 'INSERT INTO UsersLectures SELECT $1, $2 WHERE NOT EXISTS (SELECT * FROM UsersLectures WHERE userID = $1 AND lectureCode = $2)',
-        values: [USERID, data[i].categories[0].split('_')[0]],
+        values: [userID, data[i].categories[0].split('_')[0]],
       });
     }
   } catch (err) { console.log(err); }
 }
+
 // テキストメッセージの処理をする関数
 export const textEvent = async (event, client) => {
   let contexturl;
   let urlData;
-  // userIdの取得
-  const { userId } = event.source;
+  // lineIDの取得
+  const lineID = event.source.userId;
   // url入れにくるためのやつ コンテキスト管理
   try {
-    contexturl = urlDB.getData(`/${userId}/context`);
+    contexturl = urlDB.getData(`/${lineID}/context`);
   } catch (_) {
     contexturl = undefined;
   }
   // url入れるための場所
   try {
-    urlData = memoDB.getData(`/${userId}/memo`);
+    urlData = memoDB.getData(`/${lineID}/memo`);
   } catch (_) {
     urlData = undefined;
   }
@@ -81,13 +105,13 @@ export const textEvent = async (event, client) => {
     case 'urlpush': {
       // urlDataにgetData()で値が返ってきているかどうかで区別する。
       if (urlData) {
-        memoDB.delete(`/${userId}/memo`);
+        memoDB.delete(`/${lineID}/memo`);
         urlData = event.message.text;
-        memoDB.push(`/${userId}/memo`, urlData);
+        memoDB.push(`/${lineID}/memo`, urlData);
       } else {
-        memoDB.push(`/${userId}/memo`, [event.message.text]);
+        memoDB.push(`/${lineID}/memo`, [event.message.text]);
       }
-      urlDB.delete(`/${userId}/context`);
+      urlDB.delete(`/${lineID}/context`);
       return {
         type: 'text',
         text: 'URLを更新しました',
@@ -108,13 +132,20 @@ export const textEvent = async (event, client) => {
         text: 'URLを入力してください。',
       };
       // 次の文章でコンテキストを元に戻してurlをmemoDB.jsonにurlを追加する
-      urlDB.push(`/${userId}/context`, 'urlpush');
+      urlDB.push(`/${lineID}/context`, 'urlpush');
       break;
     }
 
     // urlDataに受け取っているurl文字列が格納されているのでそれをpeocessCalender()に渡してinsertを実行する
     case 'データベーステスト': {
-      processCalender(urlData, userId);
+      processCalender(urlData, lineID);
+      break;
+    }
+    case 'データベース一覧表示テスト': {
+      message = {
+        type: 'text',
+        text: await displaySubmissionList(lineID),
+      };
       break;
     }
     // 'おはよう'というメッセージが送られてきた時
