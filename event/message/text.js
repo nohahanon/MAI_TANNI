@@ -37,7 +37,7 @@ async function lineID_To_userID(lineID) {
     });
     return await res.rows[0].userid;
   } catch (err) {
-    console.log('\n\n\n\n\n\n\n\n\n\n', err);
+    console.log(err);
     return undefined;
   }
 }
