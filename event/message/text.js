@@ -141,7 +141,12 @@ export const textEvent = async (event, client) => {
         text: 'URLを入力してください。',
       };
       // 次の文章でコンテキストを元に戻してurlをmemoDB.jsonにurlを追加する
-      urlDB.push(`/${lineID}/context`, 'urlpush');
+      // urlDB.push(`/${lineID}/context`, 'urlpush');
+      const userID = lineID_To_userID(lineID);
+      pool.query({
+        text: 'UPDATE users SET (contexts)=(\'push\')WHERE (userID = $1) ',
+        values: [userID],
+      });
       break;
     }
 
