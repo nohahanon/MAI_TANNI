@@ -118,6 +118,21 @@ export const textEvent = async (event, client) => {
           text: '数字を指定しなおしてください',
         };
       }
+      case 'add': {
+        pool.query({
+          text: 'UPDATE users SET context = $1 WHERE lineID = $2;',
+          values: [null, lineID],
+        });
+        // lectureCode, deadline, nameが必要
+        pool.query({
+          text: 'INSERT INTO submissions (lectureCode, deadline, name, lineid) VALUES ($1, CURRENT_TIMESTAMP + \'7 day\', $2, $3);',
+          values: ['MYTASK', event.message.text, lineID],
+        });
+        return {
+          type: 'text',
+          text: 'タスクを追加しました',
+        };
+      }
       default: break;
     }
   } catch (err) { console.log(err); }
@@ -151,13 +166,12 @@ export const textEvent = async (event, client) => {
       break;
     }
     case 'レコード削除テスト': {
-      if ((await numOfSubmissions(lineID)) === 0) {
+      if ((await numOfSubmissions(lineID)) === '0') {
         return {
           type: 'text',
           text: 'レコードが存在しません',
         };
       }
-      console.log(await numOfSubmissions(lineID));
       message = {
         type: 'text',
         text: `削除したいレコード番号を指定してください\n\n${await displaySubmissionList(lineID)}`,
@@ -165,6 +179,17 @@ export const textEvent = async (event, client) => {
       pool.query({
         text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
         values: ['delete', lineID],
+      });
+      break;
+    }
+    case 'レコード挿入テスト': {
+      message = {
+        type: 'text',
+        text: 'レコードの内容を送信してください',
+      };
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['add', lineID],
       });
       break;
     }
