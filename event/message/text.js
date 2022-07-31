@@ -26,8 +26,8 @@ async function processCalender(url) {
     .then((response) => {
       const data = Object.values(ical.parseICS(response.data));
       pool.query({
-        text: 'INSERT INTO submission () VALUES ();',
-        values: [],
+        text: 'INSERT INTO submission (name) VALUES ($1);',
+        values: [data[0].summary],
       });
     })
     .catch((err) => console.log(err));
@@ -85,11 +85,20 @@ export const textEvent = async (event, client) => {
       break;
     }
 
-    // case 'データベーステスト': {
-    //   processCalender('https://elms.u-aizu.ac.jp/calendar/export_execute.php?userid=7036&authtoken=5452f0d36e1588eea23916f2729a31039ec10841&preset_what=all&preset_time=weeknow');
-    //   break;
-    // }
-    
+    case 'データベーステスト': {
+      processCalender('https://elms.u-aizu.ac.jp/calendar/export_execute.php?userid=7036&authtoken=5452f0d36e1588eea23916f2729a31039ec10841&preset_what=all&preset_time=weeknow');
+      break;
+    }
+
+    // '締め切り'というメッセージが送られてきた時
+    case '締め切り': {
+      const res = await pool.query({
+        text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval $1',
+        values: ['7 day'],
+      });
+      console.log(res);
+    }
+
     // 'おはよう'というメッセージが送られてきた時
     case 'おはよう': {
       // 返信するメッセージを作成
