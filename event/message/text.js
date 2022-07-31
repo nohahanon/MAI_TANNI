@@ -83,52 +83,57 @@ async function processCalender(url, lineID) {
 
 // テキストメッセージの処理をする関数
 export const textEvent = async (event, client) => {
-  let contexturl;
   let urlData;
   const urlSample = /^https:\/\/elms.u-aizu.ac.jp\/calendar\/export_execute.php\?userid\=/;
   // lineIDの取得
   const lineID = event.source.userId;
-  let urlCheck;
-  // url入れにくるためのやつ コンテキスト管理
-  try {
-    contexturl = urlDB.getData(`/${lineID}/context`);
-  } catch (_) {
-    contexturl = undefined;
-  }
-  // url入れるための場所
-  try {
-    urlData = memoDB.getData(`/${lineID}/memo`);
-  } catch (_) {
-    urlData = undefined;
-  }
+  const context = await pool.query({
+    text: 'SELECT context FROM users WHERE lineID = $1 ',
+    values: [lineID],
+  });
+  console.log(await context.rows[0].context);
 
-  // contexturlの値で区別する。getData()で値が返ってきていなかったらdefault行き。
-  switch (contexturl) {
-    case 'urlpush': {
-      // urlDataにgetData()で値が返ってきているかどうかで区別する。
-      if (urlData) {
-        memoDB.delete(`/${lineID}/memo`);
-        urlData = event.message.text;
-        memoDB.push(`/${lineID}/memo`, urlData);
-      } else {
-        memoDB.push(`/${lineID}/memo`, [event.message.text]);
-      }
-      urlDB.delete(`/${lineID}/context`);
-      urlCheck = urlData.slice(0, -2);
-      if (urlSample.test(urlCheck)) {
+  // URLを正しいか
+  try {
+    switch (await context.rows[0].context) {
+      case 'push': {
+        if (urlSample.test(event.source.userID)) {
+          pool.query({
+            text: 'UPDATE users SET (url, context) = ($1,$2) WHERE (lineID = $3)',
+            values: [event.message.text, null, lineID],
+          });
+          // pool.query({
+          //   text: 'UPDATE users SET context = $1 WHERE (lineID = $2)',
+          //   values: [null, lineID],
+          // });
+          urlData = event.message.text;
+          return {
+            type: 'text',
+            text: 'URLを更新しました',
+          };
+        }
         return {
           type: 'text',
-          text: 'URLを更新しました',
+          text: 'カレンダーのURLではありません',
         };
       }
-      return {
-        type: 'text',
-        text: 'カレンダーのURLではありません',
-      };
+      default: break;
     }
-    default:
-      break;
-  }
+  } catch (err) { console.log(err); }
+  // contexturlの値で区別する。getData()で値が返ってきていなかったらdefault行き。
+
+  /*   urlDB.delete(`/${lineID}/context`);
+     urlCheck = urlData.slice(0, -2);
+     if (urlSample.test(urlCheck)) {
+       return {
+         type: 'text',
+         text: 'URLを更新しました',
+       };
+     }
+     return {
+       type: 'text',
+       text: 'カレンダーのURLではありません',
+     }; */
 
   let message;
   // メッセージのテキストごとに条件分岐
@@ -142,10 +147,9 @@ export const textEvent = async (event, client) => {
       };
       // 次の文章でコンテキストを元に戻してurlをmemoDB.jsonにurlを追加する
       // urlDB.push(`/${lineID}/context`, 'urlpush');
-      const userID = lineID_To_userID(lineID);
       pool.query({
-        text: 'UPDATE users SET (contexts)=(\'push\')WHERE (userID = $1) ',
-        values: [userID],
+        text: 'UPDATE users SET (context) = ($1) WHERE (lineID) = ($2);',
+        values: ['push', `${lineID}`],
       });
       break;
     }
