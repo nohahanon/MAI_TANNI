@@ -85,8 +85,10 @@ async function processCalender(url, lineID) {
 export const textEvent = async (event, client) => {
   let contexturl;
   let urlData;
+  const urlSample = /^https:\/\/elms.u-aizu.ac.jp\/calendar\/export_execute.php\?userid\=/;
   // lineIDの取得
   const lineID = event.source.userId;
+  let urlCheck;
   // url入れにくるためのやつ コンテキスト管理
   try {
     contexturl = urlDB.getData(`/${lineID}/context`);
@@ -112,9 +114,16 @@ export const textEvent = async (event, client) => {
         memoDB.push(`/${lineID}/memo`, [event.message.text]);
       }
       urlDB.delete(`/${lineID}/context`);
+      urlCheck = urlData.slice(0, -2);
+      if (urlSample.test(urlCheck)) {
+        return {
+          type: 'text',
+          text: 'URLを更新しました',
+        };
+      }
       return {
         type: 'text',
-        text: 'URLを更新しました',
+        text: 'カレンダーのURLではありません',
       };
     }
     default:
