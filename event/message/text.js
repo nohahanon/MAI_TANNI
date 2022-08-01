@@ -10,6 +10,13 @@ const pool = new Pool({
   port: process.env.pgPort,
 });
 
+function initContext(lineID) {
+  pool.query({
+    text: 'UPDATE users SET context = null WHERE lineid = $1;',
+    values: [lineID],
+  });
+}
+
 async function numOfSubmissions(lineID) {
   const res = await pool.query({
     text: 'SELECT COUNT(*) FROM submissions WHERE lineid = $1;',
@@ -37,6 +44,98 @@ async function displaySubmissionList(lineID) {
   let buf = '';
   for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
   return buf;
+}
+async function displaySubmissionListFlex(lineID) {
+  const resMyTask = await pool.query({
+    text: 'SELECT name, lecturecode FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\'',
+    values: [lineID],
+  });
+  const resOther = await pool.query({
+    text: 'SELECT name, lecturecode FROM submissions WHERE lineID = $1 AND lecturecode != \'MYTASK\'',
+    values: [lineID],
+  });
+  const model = {
+    type: 'bubble',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        {
+          type: 'text',
+          text: 'TODO List',
+          weight: 'bold',
+          color: '#1DB446',
+          size: 'sm',
+        },
+        {
+          type: 'box',
+          layout: 'vertical',
+          margin: 'xxl',
+          spacing: 'sm',
+          contents: [],
+        },
+        {
+          type: 'separator',
+          margin: 'xxl',
+        },
+      ],
+    },
+    styles: {
+      footer: {
+        separator: true,
+      },
+    },
+  };
+  const separator = {
+    type: 'separator',
+    margin: 'xxl',
+  };
+  const box = {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      {
+        type: 'text',
+        text: '',
+        size: 'sm',
+        color: '#555555',
+        flex: 0,
+      },
+      {
+        type: 'text',
+        text: '',
+        size: 'sm',
+        color: '#111111',
+        align: 'end',
+      },
+    ],
+  };
+  for (let i = 1; i <= resMyTask.rows.length; i += 1) {
+    const boxTmp = JSON.parse(JSON.stringify(box));
+    if (resMyTask.rows[i - 1].name.length > 25) {
+      boxTmp.contents[0].text = `${i}:${resMyTask.rows[i - 1].name.substr(0, 25)}...`;
+      boxTmp.contents[1].text = `${resMyTask.rows[i - 1].lecturecode.trim()}`;
+      model.body.contents[1].contents.push(boxTmp);
+    } else {
+      boxTmp.contents[0].text = `${i}:${resMyTask.rows[i - 1].name}`;
+      boxTmp.contents[1].text = `${resMyTask.rows[i - 1].lecturecode.trim()}`;
+      model.body.contents[1].contents.push(boxTmp);
+    }
+  }
+  model.body.contents[1].contents.push(separator);
+  for (let i = 1; i <= resOther.rows.length; i += 1) {
+    const boxTmp = JSON.parse(JSON.stringify(box));
+    if (resOther.rows[i - 1].name.length > 25) {
+      boxTmp.contents[0].text = `${i}:${resOther.rows[i - 1].name.substr(0, 25)}...`;
+      boxTmp.contents[1].text = `${resOther.rows[i - 1].lecturecode.trim()}`;
+      model.body.contents[1].contents.push(boxTmp);
+    } else {
+      boxTmp.contents[0].text = `${i}:${resOther.rows[i - 1].name}`;
+      boxTmp.contents[1].text = `${resOther.rows[i - 1].lecturecode.trim()}`;
+      model.body.contents[1].contents.push(boxTmp);
+    }
+  }
+  return model;
 }
 
 // urlからicsデータを取得しdbにinsertする関数
@@ -93,9 +192,10 @@ export const textEvent = async (event, client) => {
             text: 'URLを更新しました',
           };
         }
+        initContext(lineID);
         return {
           type: 'text',
-          text: 'URLを指定しなおしてください',
+          text: 'はじめからやりなおしてください',
         };
       }
       case 'delete': {
@@ -113,9 +213,10 @@ export const textEvent = async (event, client) => {
             text: 'レコードを削除しました',
           };
         }
+        initContext(lineID);
         return {
           type: 'text',
-          text: '数字を指定しなおしてください',
+          text: 'はじめからやりなおしてください',
         };
       }
       case 'add': {
@@ -135,13 +236,15 @@ export const textEvent = async (event, client) => {
       }
       default: break;
     }
-  } catch (err) { console.log(err); }
+  } catch (err) {
+    console.log(err);
+    initContext(lineID);
+  }
 
   // メッセージのテキストごとに条件分岐
   switch (event.message.text) {
-    // URLの取得
+    // ユーザーのURLを受け取る処理
     case 'URL': {
-      // URLを入力させる
       message = {
         type: 'text',
         text: 'URLを入力してください。',
@@ -158,6 +261,7 @@ export const textEvent = async (event, client) => {
       processCalender(urlData.rows[0].url, lineID);
       break;
     }
+    // submissionテーブルの中身の表示
     case 'データベース一覧表示テスト': {
       message = {
         type: 'text',
@@ -165,32 +269,52 @@ export const textEvent = async (event, client) => {
       };
       break;
     }
-    case 'レコード削除テスト': {
-      if ((await numOfSubmissions(lineID)) === '0') {
-        return {
-          type: 'text',
-          text: 'レコードが存在しません',
-        };
-      }
+    case 'データベース一覧表示テストflex': {
       message = {
-        type: 'text',
-        text: `削除したいレコード番号を指定してください\n\n${await displaySubmissionList(lineID)}`,
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: await displaySubmissionListFlex(lineID),
       };
-      pool.query({
-        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
-        values: ['delete', lineID],
-      });
       break;
     }
+    // submissionsテーブルのレコードの削除
+    case 'レコード削除テスト': {
+      try {
+        if ((await numOfSubmissions(lineID)) === '0') {
+          return {
+            type: 'text',
+            text: 'レコードが存在しません',
+          };
+        }
+        message = {
+          type: 'text',
+          text: `削除したいレコード番号を指定してください\n\n${await displaySubmissionList(lineID)}`,
+        };
+        pool.query({
+          text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+          values: ['delete', lineID],
+        });
+      } catch (err) {
+        console.log(err);
+        initContext(lineID);
+      }
+      break;
+    }
+    // submissionテーブルへのレコードの挿入
     case 'レコード挿入テスト': {
       message = {
         type: 'text',
         text: 'レコードの内容を送信してください',
       };
-      pool.query({
-        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
-        values: ['add', lineID],
-      });
+      try {
+        pool.query({
+          text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+          values: ['add', lineID],
+        });
+      } catch (err) {
+        console.log(err);
+        initContext(lineID);
+      }
       break;
     }
 
@@ -203,7 +327,6 @@ export const textEvent = async (event, client) => {
       };
       break;
     }
-
     // 'こんにちは'というメッセージが送られてきた時
     case 'こんにちは': {
       // 返信するメッセージを作成
