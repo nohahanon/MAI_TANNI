@@ -186,15 +186,6 @@ export const textEvent = async (event, client) => {
       break;
     }
 
-    // '締め切り'というメッセージが送られてきた時
-    case '締め切り': {
-      const res = await pool.query({
-        text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval $1',
-        values: ['7 day'],
-      });
-      console.log(res);
-    }
-
     case 'レコード削除テスト': {
       if ((await numOfSubmissions(lineID)) === '0') {
         return {
