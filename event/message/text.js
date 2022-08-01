@@ -17,7 +17,6 @@ async function numOfSubmissions(lineID) {
   });
   return res.rows[0].count;
 }
-
 // data[].endに格納されている時間をsql用に成型します
 function convertZuluToJST(zulu) {
   const date = JSON.stringify(zulu).split('T');
@@ -27,7 +26,6 @@ function convertZuluToJST(zulu) {
   const date4 = (Number(JSON.stringify(date3[0]).slice(1, -1)) + 9) % 24;
   return `${date1} ${date4}:${date3[1]}:${date3[2]}`;
 }
-
 // submissionsから一覧を取得して表示する文字列を返す関数
 async function displaySubmissionList(lineID) {
   const res = await pool.query({
@@ -165,6 +163,38 @@ export const textEvent = async (event, client) => {
       };
       break;
     }
+    // '締め切り'というメッセージが送られてきた時
+    case 'リスト表示': {
+      const res = await pool.query({
+        text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval \'7 day\';',
+      });
+      console.log(res);
+      let buf = '';
+      for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
+      message = {
+        type: 'text',
+        text: `${buf}`,
+      };
+      break;
+    }
+
+    // 期限切れの課題を削除（定期的）
+    case '削除': {
+      await pool.query({
+        text: 'DELETE FROM submissions WHERE deadline < now();',
+      });
+      break;
+    }
+
+    // '締め切り'というメッセージが送られてきた時
+    case '締め切り': {
+      const res = await pool.query({
+        text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval $1',
+        values: ['7 day'],
+      });
+      console.log(res);
+    }
+
     case 'レコード削除テスト': {
       if ((await numOfSubmissions(lineID)) === '0') {
         return {
@@ -195,6 +225,7 @@ export const textEvent = async (event, client) => {
     }
 
     // 'おはよう'というメッセージが送られてきた時
+    // eslint-disable-next-line no-fallthrough
     case 'おはよう': {
       // 返信するメッセージを作成
       message = {
