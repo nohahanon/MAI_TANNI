@@ -1,3 +1,5 @@
+/* eslint-disable no-return-assign */
+/* eslint-disable camelcase */
 import { JsonDB } from 'node-json-db';
 import { Config } from 'node-json-db/dist/lib/JsonDBConfig.js';
 
@@ -16,51 +18,101 @@ const pool = new Pool({
   port: process.env.pgPort,
 });
 
-// pool.query('SELECT NOW()', (err, res) => {
-//   console.log(err, res);
-//   pool.end();
-// });
+// data[].endに格納されている時間をsql用に成型します
+function convertZuluToJST(zulu) {
+  const date = JSON.stringify(zulu).split('T');
+  const date1 = date[0].slice(1);
+  const date2 = date[1].split('.')[0];
+  const date3 = date2.split(':');
+  const date4 = (Number(JSON.stringify(date3[0]).slice(1, -1)) + 9) % 24;
+  return `${date1} ${date4}:${date3[1]}:${date3[2]}`;
+}
 
-async function processCalender(url) {
-  await axios.get(url)
-    .then((response) => {
-      const data = Object.values(ical.parseICS(response.data));
+// lineIDからuserIDを取得する関数
+async function lineID_To_userID(lineID) {
+  try {
+    const res = await pool.query({
+      text: 'SELECT userID FROM Users WHERE lineID = $1',
+      values: [lineID],
+    });
+    return await res.rows[0].userid;
+  } catch (err) {
+    console.log(err);
+    return undefined;
+  }
+}
+
+// submissionsから一覧を取得して表示する文字列を返す関数
+async function displaySubmissionList(lineID) {
+  const userID = await lineID_To_userID(lineID);
+  const res = await pool.query({
+    text: 'SELECT name, lectureCode FROM submissions WHERE userID = $1',
+    values: [userID],
+  });
+  let buf = '';
+  for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
+  return buf;
+}
+
+// urlからicsデータを取得しdbにinsertする関数
+async function processCalender(url, lineID) {
+  try {
+    const response = await axios.get(url);
+    // データ取得
+    const data = Object.values(ical.parseICS(response.data));
+    // dbにおけるuserIdの取得
+    const userID = lineID_To_userID(lineID);
+    if (userID === undefined) throw Error;
+    // insert処理
+    // db(submissionsとUsersLectures)の更新
+    for (let i = 0; i < data.length; i += 1) {
+      // submissionの更新
       pool.query({
         text: 'INSERT INTO submission (name) VALUES ($1);',
         values: [data[0].summary],
+
       });
-    })
-    .catch((err) => console.log(err));
+      // userslecturesの更新
+      // 知らない組み合わせを得たら更新する
+      pool.query({
+        text: 'INSERT INTO UsersLectures SELECT $1, $2 WHERE NOT EXISTS (SELECT * FROM UsersLectures WHERE userID = $1 AND lectureCode = $2)',
+        values: [userID, data[i].categories[0].split('_')[0]],
+      });
+    }
+  } catch (err) { console.log(err); }
 }
 
 // テキストメッセージの処理をする関数
 export const textEvent = async (event, client) => {
   let contexturl;
   let urlData;
-  // userIdの取得
-  const { userId } = event.source;
-  // url入れにくるためのやつ
+  // lineIDの取得
+  const lineID = event.source.userId;
+  // url入れにくるためのやつ コンテキスト管理
   try {
-    contexturl = urlDB.getData(`/${userId}/context`);
+    contexturl = urlDB.getData(`/${lineID}/context`);
   } catch (_) {
     contexturl = undefined;
   }
-  try { // url入れるための場所
-    urlData = memoDB.getData(`/${userId}/memo`);
+  // url入れるための場所
+  try {
+    urlData = memoDB.getData(`/${lineID}/memo`);
   } catch (_) {
     urlData = undefined;
   }
+
+  // contexturlの値で区別する。getData()で値が返ってきていなかったらdefault行き。
   switch (contexturl) {
     case 'urlpush': {
+      // urlDataにgetData()で値が返ってきているかどうかで区別する。
       if (urlData) {
-        memoDB.delete(`/${userId}/memo`);
-        urlData.push(event.message.text);
-        memoDB.push(`/${userId}/memo`, urlData);
+        memoDB.delete(`/${lineID}/memo`);
+        urlData = event.message.text;
+        memoDB.push(`/${lineID}/memo`, urlData);
       } else {
-        memoDB.push(`/${userId}/memo`, [event.message.text]);
+        memoDB.push(`/${lineID}/memo`, [event.message.text]);
       }
-      urlDB.delete(`/${userId}/context`);
-
+      urlDB.delete(`/${lineID}/context`);
       return {
         type: 'text',
         text: 'URLを更新しました',
@@ -80,8 +132,44 @@ export const textEvent = async (event, client) => {
         type: 'text',
         text: 'URLを入力してください。',
       };
-      // 次の文章でurl入力するところに飛ぶ
-      urlDB.push(`/${userId}/context`, 'urlpush');
+      // 次の文章でコンテキストを元に戻してurlをmemoDB.jsonにurlを追加する
+      urlDB.push(`/${lineID}/context`, 'urlpush');
+      break;
+    }
+
+    // urlDataに受け取っているurl文字列が格納されているのでそれをpeocessCalender()に渡してinsertを実行する
+    case 'データベーステスト': {
+      processCalender(urlData, lineID);
+      break;
+    }
+    case 'データベース一覧表示テスト': {
+      message = {
+        type: 'text',
+        text: await displaySubmissionList(lineID),
+      };
+      break;
+    }
+
+    // '締め切り'というメッセージが送られてきた時
+    case 'リスト表示': {
+      const res = await pool.query({
+        text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval \'7 day\';',
+      });
+      console.log(res);
+      let buf = '';
+      for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
+      message = {
+        type: 'text',
+        text: `${buf}`,
+      };
+      break;
+    }
+
+    // 期限切れの課題を削除（定期的）
+    case '削除': {
+      await pool.query({
+        text: 'DELETE FROM submissions WHERE deadline < now();',
+      });
       break;
     }
 
@@ -100,6 +188,7 @@ export const textEvent = async (event, client) => {
     }
 
     // 'おはよう'というメッセージが送られてきた時
+    // eslint-disable-next-line no-fallthrough
     case 'おはよう': {
       // 返信するメッセージを作成
       message = {
