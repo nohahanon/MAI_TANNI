@@ -126,14 +126,14 @@ async function displaySubmissionListFlex(lineID) {
       {
         type: 'text',
         text: '',
-        size: 'md',
+        size: 'xs',
         color: '#555555',
         flex: 0,
       },
       {
         type: 'text',
         text: '',
-        size: 'md',
+        size: 'xxs',
         color: '#111111',
         align: 'end',
       },
@@ -146,26 +146,21 @@ async function displaySubmissionListFlex(lineID) {
       {
         type: 'text',
         text: '',
-        size: 'md',
+        size: 'xs',
         color: '#555555',
         flex: 0,
       },
     ],
   };
-  await Promise.all(
-    resMyTask.rows.map(async (vls, idx) => {
-      model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForMyTask));
-      // console.log(JSON.stringify(model));
-    }),
-  );
+  const promises1 = resMyTask.rows.map(async (vls, idx) => {
+    model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForMyTask));
+  });
+  const promises2 = resOther.rows.map(async (vls, idx) => {
+    model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForLecture));
+  });
+  await Promise.all(promises1);
   model.body.contents[1].contents.push(separator);
-  await Promise.all(
-    resOther.rows.map(async (vls, idx) => {
-      model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForLecture));
-      // console.log(JSON.stringify(model));
-    }),
-  );
-  // console.log(JSON.stringify(model));
+  await Promise.all(promises2);
   return model;
 }
 
