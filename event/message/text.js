@@ -44,19 +44,32 @@ async function displaySubmissionList(lineID) {
   return buf;
 }
 
-// displaySubmissionListFlex()のために文字列を成型します
-function subFuncFlex(vls, idx, box, mbc1c) {
-  const criteria = 25;
+// displaySubmissionListFlex()のためにオブジェクトに格納する文字列を成型します
+async function subFuncFlex(vls, idx, box) {
+  const hankakuCriteria = 25;
+  const zenkakuCriteria = 15;
   const boxTmp = JSON.parse(JSON.stringify(box));
-  if (vls.name.length > criteria) {
-    boxTmp.contents[0].text = `${idx + 1}:${vls.name.substr(0, criteria)}...`;
-    boxTmp.contents[1].text = `${vls.lecturecode.trim()}`;
-    mbc1c.push(boxTmp);
+  const resLectureName = await pool.query({
+    text: 'SELECT name FROM lectures WHERE code = $1;',
+    values: [vls.lecturecode.trim()],
+  });
+  const zenOrHan = /^[^\x01-\x7E\uFF61-\uFF9F]+$/;
+  // 文字列がzenkakuCriteria以上の長さの全角文字列の場合抑える
+  // 文字列がhankakuCriteria以上の長さの半角文字列の場合抑える
+  if (zenOrHan.test(vls.name) && vls.name.length > zenkakuCriteria) {
+    boxTmp.contents[0].text = `${idx + 1}:${vls.name.length.substr(0, zenkakuCriteria)}...`;
+  } else if (!zenOrHan.test(vls.name) && vls.name.length > hankakuCriteria) {
+    boxTmp.contents[0].text = `${idx + 1}:${vls.name.substr(0, hankakuCriteria)}...`;
   } else {
     boxTmp.contents[0].text = `${idx + 1}:${vls.name}`;
-    boxTmp.contents[1].text = `${vls.lecturecode.trim()}`;
-    mbc1c.push(boxTmp);
   }
+  // lecturecodeが'MYTASK'の場合lecturesに聞いても何も返らないため、''を自力で代入する
+  if (vls.lecturecode.trim() !== 'MYTASK') {
+    boxTmp.contents[1].text = `${resLectureName.rows[0].name}`;
+  }
+  // console.log(boxTmp);
+  // tar.push(boxTmp);
+  return boxTmp;
 }
 
 // lineidをもとにsubmissionテーブルからタスクを取得してflex messageのcontentsに収まるオブジェクトを返します
@@ -106,29 +119,66 @@ async function displaySubmissionListFlex(lineID) {
     type: 'separator',
     margin: 'xxl',
   };
-  const box = {
+  const boxForLecture = {
     type: 'box',
     layout: 'horizontal',
     contents: [
       {
         type: 'text',
         text: '',
-        size: 'sm',
+        size: 'md',
         color: '#555555',
         flex: 0,
       },
       {
         type: 'text',
         text: '',
-        size: 'sm',
+        size: 'md',
         color: '#111111',
         align: 'end',
       },
     ],
   };
-  resMyTask.rows.map((vls, idx) => subFuncFlex(vls, idx, box, model.body.contents[1].contents));
+  const boxForMyTask = {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      {
+        type: 'text',
+        text: '',
+        size: 'md',
+        color: '#555555',
+        flex: 0,
+      },
+    ],
+  };
+  Promise.all(
+    resMyTask.rows.map(async (vls, idx) => {
+      await subFuncFlex(vls, idx, boxForMyTask);
+      // console.log(JSON.stringify(model));
+    }),
+  ).then((res) => {
+    // model.body.contents[1].contents.concat()
+    console.log(res);
+  });
   model.body.contents[1].contents.push(separator);
-  resOther.rows.map((vls, idx) => subFuncFlex(vls, idx, box, model.body.contents[1].contents));
+  Promise.all(
+    resOther.rows.map(async (vls, idx) => {
+      await subFuncFlex(vls, idx, boxForLecture);
+      // console.log(JSON.stringify(model));
+    }),
+  ).then((res) => {
+    // model.body.contents[1].contents.push(
+    console.log(res);
+  });
+  // const promises1 = resMyTask.rows.map(async (vls, idx) => {
+  //   await subFuncFlex(vls, idx, boxForMyTask);
+  // });
+  // const promises2 = resOther.rows.map(async (vls, idx) => {
+  //   await subFuncFlex(vls, idx, boxForLecture);
+  // });
+  // Promise.all(promises1).then((res) => console.log(res));
+  // Promise.all(promises2).then((res) => console.log(res));
   return model;
 }
 
@@ -378,18 +428,9 @@ export const textEvent = async (event, client) => {
         'OT04 情報処理試験対策講座',
         'OT05 キャリアデザインI',
         'OT06 キャリアデザインII',
-        'OT08 TOEIC準備コース(Level A)',
-        'OT08 TOEIC準備コース(Level B)',
+        'OT08 TOEIC準備コース',
         'OT09 課外活動コース I＜インターンシップIII（シリコンバレーC）＞',
-        'OT10 課外活動コース II＜インターンシップIII（大連）＞',
-        'OT10 課外活動コースII＜インターンシップII（国内A）＞',
-        'OT10 課外活動コースII＜インターンシップII（国内C）＞',
-        'OT10 課外活動コースII＜インターンシップII（国内D）＞',
-        'OT10 課外活動コースII＜インターンシップI（地域A）＞',
-        'OT10 課外活動コース II＜インターンシップIII（シリコンバレーA）＞',
-        'OT10 課外活動コース II＜インターンシップIII（シリコンバレーB）＞',
-        'OT10 課外活動コースII＜インターンシップI（地域B）＞',
-        'OT10 課外活動コースII＜インターンシップIII（海外 ベトナムA）＞',
+        'OT10 課外活動コース II＜インターンシップIII＞',
         'OT11 ICTベンチャー起業と経営',
         'TE01 教師入門',
         'TE02 教育入門',
@@ -456,7 +497,7 @@ export const textEvent = async (event, client) => {
           buf += dt[i].split(' ')[j];
         }
         pool.query({
-          text: 'INSERT INTO lectures VALUES ($1, $2);',
+          text: 'INSERT INTO lectures (code, name) VALUES ($1, $2);',
           values: [dt[i].split(' ')[0], buf],
         });
       }
