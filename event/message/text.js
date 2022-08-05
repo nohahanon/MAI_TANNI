@@ -1,7 +1,7 @@
 import axios from 'axios';
 import ical from 'ical';
 import Pool from 'pg-pool';
-/*
+
 const pool = new Pool({
   user: process.env.pgUser,
   host: process.env.pgHost,
@@ -9,8 +9,7 @@ const pool = new Pool({
   password: process.env.pgPassWord,
   port: process.env.pgPort,
 });
-*/
-/*
+
 async function numOfSubmissions(lineID) {
   const res = await pool.query({
     text: 'SELECT COUNT(*) FROM submissions WHERE lineid = $1;',
@@ -61,86 +60,84 @@ async function processCalender(url, lineID) {
     }
   } catch (err) { console.log(err); }
 }
-*/
+
 // テキストメッセージの処理をする関数
 export const textEvent = async (event, client) => {
   // lineIDの取得
   const lineID = event.source.userId;
-  /*  const urlData = await pool.query({
-      text: 'SELECT url FROM users WHERE lineid = $1;',
-      values: [lineID],
-    });
-    */
+  const urlData = await pool.query({
+    text: 'SELECT url FROM users WHERE lineid = $1;',
+    values: [lineID],
+  });
   let message;
-  /*
-    // url更新処理
-    // ユーザーのcontextを確認する。pushなら対応する。
-    const context = await pool.query({
-      text: 'SELECT context FROM users WHERE lineID = $1;',
-      values: [lineID],
-    });
-    const urlSample = /^https:\/\/elms.u-aizu.ac.jp\/calendar\/export_execute.php\?userid\=/;
-    try {
-      switch (await context.rows[0].context) {
-        case 'push': {
-          if (urlSample.test(event.message.text)) {
-            pool.query({
-              text: 'UPDATE users SET (url, context) = ($1, $2) WHERE (lineID = $3);',
-              values: [event.message.text, null, lineID],
-            });
-            return {
-              type: 'text',
-              text: 'URLを更新しました',
-            };
-          }
-          return {
-            type: 'text',
-            text: 'URLを指定しなおしてください',
-          };
-        }
-        case 'delete': {
-          if (!Number.isNaN(event.message.text)) {
-            pool.query({
-              text: 'DELETE FROM submissions WHERE submissionid = (SELECT submissionid FROM submissions WHERE lineid = $1 LIMIT 1 OFFSET $2);',
-              values: [lineID, event.message.text - 1],
-            });
-            pool.query({
-              text: 'UPDATE users SET context = null WHERE lineid = $1;',
-              values: [lineID],
-            });
-            return {
-              type: 'text',
-              text: 'レコードを削除しました',
-            };
-          }
-          return {
-            type: 'text',
-            text: '数字を指定しなおしてください',
-          };
-        }
-        case 'add': {
+
+  // url更新処理
+  // ユーザーのcontextを確認する。pushなら対応する。
+  const context = await pool.query({
+    text: 'SELECT context FROM users WHERE lineID = $1;',
+    values: [lineID],
+  });
+  const urlSample = /^https:\/\/elms.u-aizu.ac.jp\/calendar\/export_execute.php\?userid\=/;
+  try {
+    switch (await context.rows[0].context) {
+      case 'push': {
+        if (urlSample.test(event.message.text)) {
           pool.query({
-            text: 'UPDATE users SET context = $1 WHERE lineID = $2;',
-            values: [null, lineID],
-          });
-          // lectureCode, deadline, nameが必要
-          pool.query({
-            text: 'INSERT INTO submissions (lectureCode, deadline, name, lineid) VALUES ($1, CURRENT_TIMESTAMP + \'7 day\', $2, $3);',
-            values: ['MYTASK', event.message.text, lineID],
+            text: 'UPDATE users SET (url, context) = ($1, $2) WHERE (lineID = $3);',
+            values: [event.message.text, null, lineID],
           });
           return {
             type: 'text',
-            text: 'タスクを追加しました',
+            text: 'URLを更新しました',
           };
         }
-        default: break;
+        return {
+          type: 'text',
+          text: 'URLを指定しなおしてください',
+        };
       }
-    } catch (err) { console.log(err); }
-  */
+      case 'delete': {
+        if (!Number.isNaN(event.message.text)) {
+          pool.query({
+            text: 'DELETE FROM submissions WHERE submissionid = (SELECT submissionid FROM submissions WHERE lineid = $1 LIMIT 1 OFFSET $2);',
+            values: [lineID, event.message.text - 1],
+          });
+          pool.query({
+            text: 'UPDATE users SET context = null WHERE lineid = $1;',
+            values: [lineID],
+          });
+          return {
+            type: 'text',
+            text: 'レコードを削除しました',
+          };
+        }
+        return {
+          type: 'text',
+          text: '数字を指定しなおしてください',
+        };
+      }
+      case 'add': {
+        pool.query({
+          text: 'UPDATE users SET context = $1 WHERE lineID = $2;',
+          values: [null, lineID],
+        });
+        // lectureCode, deadline, nameが必要
+        pool.query({
+          text: 'INSERT INTO submissions (lectureCode, deadline, name, lineid) VALUES ($1, CURRENT_TIMESTAMP + \'7 day\', $2, $3);',
+          values: ['MYTASK', event.message.text, lineID],
+        });
+        return {
+          type: 'text',
+          text: 'タスクを追加しました',
+        };
+      }
+      default: break;
+    }
+  } catch (err) { console.log(err); }
+
   // メッセージのテキストごとに条件分岐
   switch (event.message.text) {
     // URLの取得
-    /*
     case 'URL': {
       // URLを入力させる
       message = {
@@ -153,7 +150,7 @@ export const textEvent = async (event, client) => {
       });
       break;
     }
-  
+
     // urlDataに受け取っているurl文字列が格納されているのでそれをpeocessCalender()に渡してinsertを実行する
     case 'データベーステスト': {
       processCalender(urlData.rows[0].url, lineID);
@@ -180,7 +177,7 @@ export const textEvent = async (event, client) => {
       };
       break;
     }
-  
+
     // 期限切れの課題を削除（定期的）
     case '削除': {
       await pool.query({
@@ -188,7 +185,7 @@ export const textEvent = async (event, client) => {
       });
       break;
     }
-  
+
     case 'レコード削除テスト': {
       if ((await numOfSubmissions(lineID)) === '0') {
         return {
@@ -217,7 +214,7 @@ export const textEvent = async (event, client) => {
       });
       break;
     }
-  */
+
     // 'おはよう'というメッセージが送られてきた時
     // eslint-disable-next-line no-fallthrough
     case 'おはよう': {
