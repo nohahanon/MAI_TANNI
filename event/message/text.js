@@ -152,33 +152,20 @@ async function displaySubmissionListFlex(lineID) {
       },
     ],
   };
-  Promise.all(
+  await Promise.all(
     resMyTask.rows.map(async (vls, idx) => {
-      await subFuncFlex(vls, idx, boxForMyTask);
+      model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForMyTask));
       // console.log(JSON.stringify(model));
     }),
-  ).then((res) => {
-    // model.body.contents[1].contents.concat()
-    console.log(res);
-  });
+  );
   model.body.contents[1].contents.push(separator);
-  Promise.all(
+  await Promise.all(
     resOther.rows.map(async (vls, idx) => {
-      await subFuncFlex(vls, idx, boxForLecture);
+      model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForLecture));
       // console.log(JSON.stringify(model));
     }),
-  ).then((res) => {
-    // model.body.contents[1].contents.push(
-    console.log(res);
-  });
-  // const promises1 = resMyTask.rows.map(async (vls, idx) => {
-  //   await subFuncFlex(vls, idx, boxForMyTask);
-  // });
-  // const promises2 = resOther.rows.map(async (vls, idx) => {
-  //   await subFuncFlex(vls, idx, boxForLecture);
-  // });
-  // Promise.all(promises1).then((res) => console.log(res));
-  // Promise.all(promises2).then((res) => console.log(res));
+  );
+  // console.log(JSON.stringify(model));
   return model;
 }
 
