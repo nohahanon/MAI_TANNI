@@ -10,6 +10,13 @@ const pool = new Pool({
   port: process.env.pgPort,
 });
 
+function initContext(lineID) {
+  pool.query({
+    text: 'UPDATE users SET context = null WHERE lineid = $1;',
+    values: [lineID],
+  });
+}
+
 async function numOfSubmissions(lineID) {
   const res = await pool.query({
     text: 'SELECT COUNT(*) FROM submissions WHERE lineid = $1;',
@@ -35,6 +42,126 @@ async function displaySubmissionList(lineID) {
   let buf = '';
   for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
   return buf;
+}
+
+// displaySubmissionListFlex()のためにオブジェクトに格納する文字列を成型します
+async function subFuncFlex(vls, idx, box) {
+  const hankakuCriteria = 25;
+  const zenkakuCriteria = 15;
+  const boxTmp = JSON.parse(JSON.stringify(box));
+  const resLectureName = await pool.query({
+    text: 'SELECT name FROM lectures WHERE code = $1;',
+    values: [vls.lecturecode.trim()],
+  });
+  const zenOrHan = /^[^\x01-\x7E\uFF61-\uFF9F]+$/;
+  // 文字列がzenkakuCriteria以上の長さの全角文字列の場合抑える
+  // 文字列がhankakuCriteria以上の長さの半角文字列の場合抑える
+  if (zenOrHan.test(vls.name) && vls.name.length > zenkakuCriteria) {
+    boxTmp.contents[0].text = `${idx + 1}:${vls.name.length.substr(0, zenkakuCriteria)}...`;
+  } else if (!zenOrHan.test(vls.name) && vls.name.length > hankakuCriteria) {
+    boxTmp.contents[0].text = `${idx + 1}:${vls.name.substr(0, hankakuCriteria)}...`;
+  } else {
+    boxTmp.contents[0].text = `${idx + 1}:${vls.name}`;
+  }
+  // lecturecodeが'MYTASK'の場合lecturesに聞いても何も返らないため、''を自力で代入する
+  if (vls.lecturecode.trim() !== 'MYTASK') {
+    boxTmp.contents[1].text = `${resLectureName.rows[0].name}`;
+  }
+  // console.log(boxTmp);
+  // tar.push(boxTmp);
+  return boxTmp;
+}
+
+// lineidをもとにsubmissionテーブルからタスクを取得してflex messageのcontentsに収まるオブジェクトを返します
+async function displaySubmissionListFlex(lineID) {
+  const resMyTask = await pool.query({
+    text: 'SELECT name, lecturecode FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\'',
+    values: [lineID],
+  });
+  const resOther = await pool.query({
+    text: 'SELECT name, lecturecode FROM submissions WHERE lineID = $1 AND lecturecode != \'MYTASK\'',
+    values: [lineID],
+  });
+  // lecturesを参照してcodeをnameに置き換える。
+  const model = {
+    type: 'bubble',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        {
+          type: 'text',
+          text: 'TODO List',
+          weight: 'bold',
+          color: '#1DB446',
+          size: 'sm',
+        },
+        {
+          type: 'box',
+          layout: 'vertical',
+          margin: 'xxl',
+          spacing: 'sm',
+          contents: [],
+        },
+        {
+          type: 'separator',
+          margin: 'xxl',
+        },
+      ],
+    },
+    styles: {
+      footer: {
+        separator: true,
+      },
+    },
+  };
+  const separator = {
+    type: 'separator',
+    margin: 'xxl',
+  };
+  const boxForLecture = {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      {
+        type: 'text',
+        text: '',
+        size: 'xs',
+        color: '#555555',
+        flex: 0,
+      },
+      {
+        type: 'text',
+        text: '',
+        size: 'xxs',
+        color: '#111111',
+        align: 'end',
+      },
+    ],
+  };
+  const boxForMyTask = {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      {
+        type: 'text',
+        text: '',
+        size: 'xs',
+        color: '#555555',
+        flex: 0,
+      },
+    ],
+  };
+  const promises1 = resMyTask.rows.map(async (vls, idx) => {
+    model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForMyTask));
+  });
+  const promises2 = resOther.rows.map(async (vls, idx) => {
+    model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForLecture));
+  });
+  await Promise.all(promises1);
+  model.body.contents[1].contents.push(separator);
+  await Promise.all(promises2);
+  return model;
 }
 
 // urlからicsデータを取得しdbにinsertする関数
@@ -91,9 +218,10 @@ export const textEvent = async (event, client) => {
             text: 'URLを更新しました',
           };
         }
+        initContext(lineID);
         return {
           type: 'text',
-          text: 'URLを指定しなおしてください',
+          text: 'はじめからやりなおしてください',
         };
       }
       case 'delete': {
@@ -111,9 +239,10 @@ export const textEvent = async (event, client) => {
             text: 'レコードを削除しました',
           };
         }
+        initContext(lineID);
         return {
           type: 'text',
-          text: '数字を指定しなおしてください',
+          text: 'はじめからやりなおしてください',
         };
       }
       case 'add': {
@@ -133,13 +262,266 @@ export const textEvent = async (event, client) => {
       }
       default: break;
     }
-  } catch (err) { console.log(err); }
+  } catch (err) {
+    console.log(err);
+    initContext(lineID);
+  }
 
   // メッセージのテキストごとに条件分岐
   switch (event.message.text) {
-    // URLの取得
+    case 'insertTolectures': {
+      const dt = ['HS04 言語学',
+        'HS05 文学',
+        'HS06 芸術学',
+        'HS07 ジェンダー・セクシュアリティ論',
+        'HS09 法学',
+        'HS10 経済学',
+        'HS11 社会学',
+        'HS12 日本国憲法',
+        'HS13 国際関係論',
+        'HS16 保健体育理論',
+        'HS17 科学史',
+        'HS19 会津の歴史と文化',
+        'HS20 アカデミックスキル１',
+        'HS21 アカデミックスキル２',
+        'HS22 地域社会学',
+        'HS23 経済発展論',
+        'PA01 体育実技１',
+        'PA02 体育実技２',
+        'PA03 体育実技３',
+        'PA04 体育実技４',
+        'EN01 Introductory English 1',
+        'EN02 Introductory English 2',
+        'EN03 Bridge 1 to Intermediate English',
+        'EN04 Bridge 2 to Intermediate English',
+        'EN05 Intermediate English 1',
+        'EN06 Intermediate English 2',
+        'EN07 Advanced English',
+        'EN08 Thesis Writing and Presentation',
+        'EG101 Global Experience Gateway (RHIT)',
+        'EG102 Global Experience Gateway (Waikato)',
+        'JP01 初級日本語 I [留学生対象]',
+        'JP02 初級日本語 II [留学生対象]',
+        'JP03 中級日本語 I [留学生対象]',
+        'JP04 中級日本語 II [留学生対象]',
+        'JP05 上級日本語 I [留学生対象]',
+        'JP06 上級日本語 II [留学生対象]',
+        'JP07 ビジネス日本語 [留学生対象]',
+        'EL102 Design of Human Languages',
+        'EL115 Analysis of English Sentence Structure',
+        'EL131 Language and Linguistics',
+        'EL134 High Frequency Vocabulary',
+        'EL144 Conversation Analysis and the Pragmatics of Spoken Interaction',
+        'EL146 Corpus Linguistics for Language Learners',
+        'EL152 Reading Fluency',
+        'EL154 SDGs で学ぶ英語ディスカッション',
+        'EL155 Notetaking and Listening Skills for Academic Lectures in English',
+        'EL218 English Speaking and Presentation Skills',
+        'EL222 Business Writing and Presentations',
+        'EL244 An Introduction to Cross-cultural Communication',
+        'EL247 Second Language Acquisition Methods',
+        'EL248 Visualization and Storytelling in Data Science',
+        'EL314 Experimental Methods and Statistics for Linguistics',
+        'EL315 Design and Analysis for IT Business',
+        'EL317 Patterns and language',
+        'EL318 ICT in Education',
+        'EL321 Pronunciation: Acoustic Analysis Using Software',
+        'EL329 Critical Thinking',
+        'EL330 Computer Science Vocabulary',
+        'EL331 Authorship analysis using Python',
+        'MA01 線形代数 I',
+        'MA02 線形代数 II',
+        'MA03 微積分 I',
+        'MA04 微積分 II',
+        'MA05 フーリエ解析',
+        'MA06 複素関数論',
+        'MA07 確率統計学',
+        'MA08 応用代数',
+        'MA09 数理論理学',
+        'MA10 位相幾何学概論',
+        'NS01 力学',
+        'NS02 電磁気学',
+        'NS03 量子力学',
+        'NS04 半導体デバイス',
+        'NS05 熱・統計力学',
+        'LI01 コンピュータリテラシー',
+        'LI03 コンピュータ理工学のすすめ',
+        'LI04 コンピュータシステム概論',
+        'LI06 情報セキュリティ',
+        'LI07 情報と職業',
+        'LI08 情報倫理',
+        'LI09 システム開発とプロジェクトマネジメントの基礎',
+        'LI10 マルチメディアシステム概論',
+        'LI11 コンピュータネットワーク概論',
+        'LI12 創造力開発スタジオ',
+        'LI13 コンピュータ理工学演習 I',
+        'LI14 コンピュータ理工学演習 II',
+        'PL01 プログラミング入門',
+        'PL02 プログラミングC',
+        'PL03 プログラミングJAVA I',
+        'PL04 プログラミングC++',
+        'PL05 コンピュータ言語論',
+        'PL06 プログラミングJAVA II',
+        'FU01 アルゴリズムとデータ構造 I',
+        'FU02 情報理論と圧縮',
+        'FU03 離散系論',
+        'FU04 論理回路設計論',
+        'FU05 コンピュータアーキテクチャ論',
+        'FU06 オペレーティングシステム論',
+        'FU08 オートマトンと言語理論',
+        'FU09 アルゴリズムとデータ構造 II',
+        'FU10 言語処理系論',
+        'FU11 数値解析',
+        'FU14 ソフトウェア工学概論',
+        'FU15 データマネジメント概論',
+        'SY02 電子回路',
+        'SY04 組込みシステム',
+        'SY05 並列コンピュータシステム',
+        'SY06 VLSI設計技術',
+        'SY07 論理回路設計特論',
+        'CN02 ネットワークセキュリティ',
+        'CN03 ネットワークプログラミング',
+        'CN04 ワイヤレスネットワーク',
+        'CN05 コンピュータネットワークシステムのモデリングとシミュレーション',
+        'IT01 人工知能',
+        'IT02 コンピュータグラフィックス論',
+        'IT03 画像処理論',
+        'IT05 ロボット工学と自動制御',
+        'IT06 ヒューマンインターフェイスと仮想現実',
+        'IT08 信号処理と線形システム',
+        'IT09 音響音声処理論',
+        'IT10 ビジュアルコンピューティングのための幾何学',
+        'IT11 情報検索と自然言語処理',
+        'SE01 ウェブエンジニアリング',
+        'SE04 ソフトウェア工学特論',
+        'SE05 ソフトウェアスタジオ',
+        'SE06 並列分散コンピューティング',
+        'SE07 データベースシステム論',
+        'SE08 データマイニング概論 [SE-DE]',
+        'OT01-I ベンチャー基本コース各論 I',
+        'OT01-II ベンチャー基本コース各論 II',
+        'OT02-1 ベンチャー体験工房 1',
+        'OT02-2 ベンチャー体験工房 2',
+        'OT02-3 ベンチャー体験工房 3',
+        'OT02-4 ベンチャー体験工房 4',
+        'OT02-5 ベンチャー体験工房 5',
+        'OT02-6 ベンチャー体験工房 6',
+        'OT02-9 ベンチャー体験工房 9',
+        'OT04 情報処理試験対策講座',
+        'OT05 キャリアデザインI',
+        'OT06 キャリアデザインII',
+        'OT08 TOEIC準備コース',
+        'OT09 課外活動コース I＜インターンシップIII（シリコンバレーC）＞',
+        'OT10 課外活動コース II＜インターンシップIII＞',
+        'OT11 ICTベンチャー起業と経営',
+        'TE01 教師入門',
+        'TE02 教育入門',
+        'TE03 教育心理学',
+        'TE04 教育課程論',
+        'TE05 教育方法',
+        'TE06 数学科教育法１',
+        'TE07 数学科教育法２',
+        'TE08 数学科教育法３',
+        'TE09 数学科教育法４',
+        'TE10 情報科教育法１',
+        'TE11 情報科教育法２',
+        'TE12 道徳教育',
+        'TE13 特別活動',
+        'TE14 生徒指導・教育相談',
+        'TE15 キャリア教育',
+        'TE16 教育実習１',
+        'TE17 教育実習２',
+        'TE18 教育実習事前事後指導',
+        'TE19 教育制度論',
+        'TE20 教職実践演習（中・高）',
+        'TE21 特別支援教育入門',
+        'TE22 総合的な学習の時間の指導法',
+        'TE23 情報機器の活用に関する理論と方法',
+        'IE01 システム総合演習 I',
+        'IE02 システム総合演習 II',
+        'IE03 ソフトウェア総合演習 I',
+        'IE04 ソフトウェア総合演習 II',
+        'OT03-001 大規模分散Webインフラ構築入門',
+        'OT03-002 学内生活を便利にするアプリケーション・サービスを作ろう',
+        'OT03-003 AI・ロボットと倫理',
+        'OT03-004 月惑星データ解析＆国際宇宙ステーションたんぽぽプロジェクト',
+        'OT03-005 教師になろう！',
+        'OT03-006 機械学習技術の紹介とレコメンダーシステムへの応用',
+        'OT03-007 Observable (D3.js)を用いた情報可視化プロトタイピング',
+        'OT03-008 韓国語と韓国文化',
+        'OT03-009 社会調査とICTによる地域サポートプロジェクト',
+        'OT03-010 課題解決型プロジェクト入門 - 理工系学生のための異文化理解及び地域イノベーション -',
+        'OT03-011 論理的思考、批判的思考(クリティカルシンキング)',
+        'OT03-012 Human Body Motion Analysis Project',
+        'OT03-013 競技用ロボットの開発',
+        'OT03-014 コンピュータを使った音と映像のコンテンツ制作',
+        'OT03-015 A Peek Inside Computers',
+        'OT03-016 会津ならではのスポーツ活動',
+        'OT03-017 電子工作プロジェクト',
+        'OT03-018 マナビーノ Arduino/Pi',
+        'OT03-019 夏季 海外準備のための英語体験プログラム',
+        'OT03-020 Designing Air Pollution Analytical Framework for SORAMAME',
+        'OT03-021 Computer Modeling in Biomedical Engineering',
+        'OT03-022 自分で作ったAI回路を動かそう！！',
+        'OT03-023 Advanced Pattern Recognition and Software Development',
+        'OT03-024 Korean IT and Culture Study',
+        'OT03-025 ソフトなハード「FPGA」を使ったLSI設計の基礎',
+        'OT03-026 コンピュータを使ってプログラムや理論の正しさを証明しよう',
+        'OT03-027 SNSを活用する地域ブランディングの方法についての研究',
+        'OT03-028 競技プログラミング',
+        'OT03-029 実践的プログラミング',
+        'OT03-030 スポーツ×ICTに関わるウェアラブルセンサーの制作',
+        'OT03-031 Meaning Expression in the English Language',
+        'OT03-032 ミクロな世界の回路を描いてみよう -EDAツールを用いた回路設計入門-'];
+      for (let i = 0; i < dt.length; i += 1) {
+        let buf = '';
+        for (let j = 1; j < dt[i].split(' ').length; j += 1) {
+          buf += dt[i].split(' ')[j];
+        }
+        pool.query({
+          text: 'INSERT INTO lectures (code, name) VALUES ($1, $2);',
+          values: [dt[i].split(' ')[0], buf],
+        });
+      }
+      break;
+    }
+    case 'その他': {
+      message = {
+        type: 'text',
+        text: '機能を選択してください',
+        quickReply: {
+          items: [
+            {
+              type: 'action',
+              action: {
+                type: 'postback',
+                label: '講義について',
+                data: '講義について',
+              },
+            },
+            {
+              type: 'action',
+              action: {
+                type: 'postback',
+                label: '開発中！',
+                data: '開発中1',
+              },
+            },
+            {
+              type: 'action',
+              action: {
+                type: 'postback',
+                label: '開発中！',
+                data: '開発中2',
+              },
+            },
+          ],
+        },
+      };
+      break;
+    }
+    // ユーザーのURLを受け取る処理
     case 'URL': {
-      // URLを入力させる
       message = {
         type: 'text',
         text: 'URLを入力してください。',
@@ -150,12 +532,12 @@ export const textEvent = async (event, client) => {
       });
       break;
     }
-
     // urlDataに受け取っているurl文字列が格納されているのでそれをpeocessCalender()に渡してinsertを実行する
     case 'データベーステスト': {
       processCalender(urlData.rows[0].url, lineID);
       break;
     }
+    // submissionテーブルの中身の表示
     case 'データベース一覧表示テスト': {
       message = {
         type: 'text',
@@ -163,6 +545,15 @@ export const textEvent = async (event, client) => {
       };
       break;
     }
+    case 'データベース一覧表示テストflex': {
+      message = {
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: await displaySubmissionListFlex(lineID),
+      };
+      break;
+    }
+    // submissionsテーブルのレコードの削除
     // '締め切り'というメッセージが送られてきた時
     case 'リスト表示': {
       const res = await pool.query({
@@ -177,7 +568,6 @@ export const textEvent = async (event, client) => {
       };
       break;
     }
-
     // 期限切れの課題を削除（定期的）
     case '削除': {
       await pool.query({
@@ -185,33 +575,43 @@ export const textEvent = async (event, client) => {
       });
       break;
     }
-
     case 'レコード削除テスト': {
-      if ((await numOfSubmissions(lineID)) === '0') {
-        return {
+      try {
+        if ((await numOfSubmissions(lineID)) === '0') {
+          return {
+            type: 'text',
+            text: 'レコードが存在しません',
+          };
+        }
+        message = {
           type: 'text',
-          text: 'レコードが存在しません',
+          text: `削除したいレコード番号を指定してください\n\n${await displaySubmissionList(lineID)}`,
         };
+        pool.query({
+          text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+          values: ['delete', lineID],
+        });
+      } catch (err) {
+        console.log(err);
+        initContext(lineID);
       }
-      message = {
-        type: 'text',
-        text: `削除したいレコード番号を指定してください\n\n${await displaySubmissionList(lineID)}`,
-      };
-      pool.query({
-        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
-        values: ['delete', lineID],
-      });
       break;
     }
+    // submissionテーブルへのレコードの挿入
     case 'レコード挿入テスト': {
       message = {
         type: 'text',
         text: 'レコードの内容を送信してください',
       };
-      pool.query({
-        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
-        values: ['add', lineID],
-      });
+      try {
+        pool.query({
+          text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+          values: ['add', lineID],
+        });
+      } catch (err) {
+        console.log(err);
+        initContext(lineID);
+      }
       break;
     }
 
@@ -225,7 +625,6 @@ export const textEvent = async (event, client) => {
       };
       break;
     }
-
     // 'こんにちは'というメッセージが送られてきた時
     case 'こんにちは': {
       // 返信するメッセージを作成
