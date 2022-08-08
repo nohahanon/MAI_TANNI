@@ -16,7 +16,6 @@ import unfollowFunc from './event/unfollow.js';
 import memberJoinedFunc from './event/memberJoined.js';
 import memberLeftFunc from './event/memberLeft.js';
 
-
 const pool = new Pool({
   user: process.env.pgUser,
   host: process.env.pgHost,
@@ -58,7 +57,7 @@ export const index = (req, res) => {
         case 'postback': {
           // ポストバックイベントが飛んできた時はpostback.jsのindexを呼び出す
           // 処理結果をmessageに格納
-          message = postbackFunc(event);
+          message = await postbackFunc(event);
           break;
         }
         case 'join': {
