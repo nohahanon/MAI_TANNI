@@ -76,7 +76,7 @@ export const index = (req, res) => {
           // フォローイベントが飛んできた時はfollow.jsのindexを呼び出す
           message = followFunc();
           pool.query({
-            text: 'INSERT INTO users (lineID) VALUES ($1::char);',
+            text: 'INSERT INTO users (lineID) VALUES ($1);',
             values: [event.sorce.userId],
           });
           break;
@@ -86,7 +86,7 @@ export const index = (req, res) => {
           // 処理結果をmessageに格納
           unfollowFunc(event);
           pool.query({
-            text: 'DELETE FROM users WHERE lineID = $1::char',
+            text: 'DELETE FROM users WHERE lineID = $1',
             values: [event.sorce.userId],
           });
           break;
@@ -95,6 +95,10 @@ export const index = (req, res) => {
           // メンバー参加イベントが飛んできた時はmemberJoined.jsのindexを呼び出す
           // 処理結果をmessageに格納
           message = memberJoinedFunc(event);
+          pool.query({
+            text: 'INSERT INTO users (lineID) VALUES ($1);',
+            values: [event.sorce.userId],
+          }); 
           break;
         }
         case 'memberLeft': {
