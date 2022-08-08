@@ -1,3 +1,4 @@
+/* eslint-disable linebreak-style */
 import Pool from 'pg-pool';
 
 const pool = new Pool({
@@ -8,6 +9,32 @@ const pool = new Pool({
   port: process.env.pgPort,
 });
 
+// submissionsから一覧を取得して表示する文字列を返す関数
+async function displaySubmissionList(lineID) {
+  const res = await pool.query({
+    text: 'SELECT name, lectureCode FROM submissions WHERE lineID = $1',
+    values: [lineID],
+  });
+  let buf = '';
+  for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name.trim()}\n`;
+  return buf;
+}
+
+function initContext(lineID) {
+  pool.query({
+    text: 'UPDATE users SET context = null WHERE lineid = $1;',
+    values: [lineID],
+  });
+}
+
+async function numOfSubmissions(lineID) {
+  const res = await pool.query({
+    text: 'SELECT COUNT(*) FROM submissions WHERE lineid = $1;',
+    values: [lineID],
+  });
+  return res.rows[0].count;
+}
+
 async function displayLecturesList() {
   const res = await pool.query({
     text: 'SELECT * FROM lectures;',
@@ -16,11 +43,133 @@ async function displayLecturesList() {
   for (let i = 0; i < res.rows.length; i += 1)buf += `${res.rows[i].code.trim()}: ${res.rows[i].name.trim()}\n`;
   return buf;
 }
+
+// displaySubmissionListFlex()のためにオブジェクトに格納する文字列を成型します
+async function subFuncFlex(vls, idx, box) {
+  const hankakuCriteria = 25;
+  const zenkakuCriteria = 15;
+  const boxTmp = JSON.parse(JSON.stringify(box));
+  const resLectureName = await pool.query({
+    text: 'SELECT name FROM lectures WHERE code = $1;',
+    values: [vls.lecturecode.trim()],
+  });
+  const zenOrHan = /^[^\x01-\x7E\uFF61-\uFF9F]+$/;
+  // 文字列がzenkakuCriteria以上の長さの全角文字列の場合抑える
+  // 文字列がhankakuCriteria以上の長さの半角文字列の場合抑える
+  if (zenOrHan.test(vls.name) && vls.name.length > zenkakuCriteria) {
+    boxTmp.contents[0].text = `${idx + 1}:${vls.name.length.substr(0, zenkakuCriteria)}...`;
+  } else if (!zenOrHan.test(vls.name) && vls.name.length > hankakuCriteria) {
+    boxTmp.contents[0].text = `${idx + 1}:${vls.name.substr(0, hankakuCriteria)}...`;
+  } else {
+    boxTmp.contents[0].text = `${idx + 1}:${vls.name}`;
+  }
+  // lecturecodeが'MYTASK'の場合lecturesに聞いても何も返らないため、''を自力で代入する
+  if (vls.lecturecode.trim() !== 'MYTASK') {
+    boxTmp.contents[1].text = `${resLectureName.rows[0].name}`;
+  }
+  // console.log(boxTmp);
+  // tar.push(boxTmp);
+  return boxTmp;
+}
+
+// lineidをもとにsubmissionテーブルからタスクを取得してflex messageのcontentsに収まるオブジェクトを返します
+async function displaySubmissionListFlex(lineID) {
+  const resMyTask = await pool.query({
+    text: 'SELECT name, lecturecode FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\'',
+    values: [lineID],
+  });
+  const resOther = await pool.query({
+    text: 'SELECT name, lecturecode FROM submissions WHERE lineID = $1 AND lecturecode != \'MYTASK\'',
+    values: [lineID],
+  });
+  // lecturesを参照してcodeをnameに置き換える。
+  const model = {
+    type: 'bubble',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        {
+          type: 'text',
+          text: 'TODO List',
+          weight: 'bold',
+          color: '#1DB446',
+          size: 'sm',
+        },
+        {
+          type: 'box',
+          layout: 'vertical',
+          margin: 'xxl',
+          spacing: 'sm',
+          contents: [],
+        },
+        {
+          type: 'separator',
+          margin: 'xxl',
+        },
+      ],
+    },
+    styles: {
+      footer: {
+        separator: true,
+      },
+    },
+  };
+  const separator = {
+    type: 'separator',
+    margin: 'xxl',
+  };
+  const boxForLecture = {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      {
+        type: 'text',
+        text: '',
+        size: 'xs',
+        color: '#555555',
+        flex: 0,
+      },
+      {
+        type: 'text',
+        text: '',
+        size: 'xxs',
+        color: '#111111',
+        align: 'end',
+      },
+    ],
+  };
+  const boxForMyTask = {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      {
+        type: 'text',
+        text: '',
+        size: 'xs',
+        color: '#555555',
+        flex: 0,
+      },
+    ],
+  };
+  const promises1 = await resMyTask.rows.map(async (vls, idx) => {
+    model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForMyTask));
+  });
+  const promises2 = await resOther.rows.map(async (vls, idx) => {
+    model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForLecture));
+  });
+  await Promise.all(promises1);
+  model.body.contents[1].contents.push(separator);
+  await Promise.all(promises2);
+  console.log(model.body.contents[1].contents);
+  return model;
+}
+
 const tmp = async (postbackData, lineID) => {
   let message;
+
   switch (postbackData) {
-    // 'リスト取得'というメッセージが送られてきた時
-    case 'リスト取得': {
+    case '定期表示': {
       const res = await pool.query({
         text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval \'7 day\';',
       });
@@ -33,12 +182,41 @@ const tmp = async (postbackData, lineID) => {
       };
       break;
     }
+    case '定期削除': {
+      pool.query({
+        text: 'DELETE FROM submissions WHERE deadline < now();',
+      });
+      break;
+    }
+    case 'リスト取得': {
+      if ((await numOfSubmissions(lineID)) === '0') {
+        return {
+          type: 'text',
+          text: 'リストは空です',
+        };
+      }
+      message = {
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: await displaySubmissionListFlex(lineID),
+      };
+      break;
+    }
 
     case '項目追加': {
       message = {
         type: 'text',
-        text: '項目追加',
+        text: '追加するタスクを送信してください',
       };
+      try {
+        pool.query({
+          text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+          values: ['add', lineID],
+        });
+      } catch (err) {
+        console.log(err);
+        initContext(lineID);
+      }
       break;
     }
 
@@ -46,7 +224,7 @@ const tmp = async (postbackData, lineID) => {
       // URLを入力させる
       message = {
         type: 'text',
-        text: 'URLを入力してください。',
+        text: 'URLを入力してください',
       };
       pool.query({
         text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
@@ -56,17 +234,60 @@ const tmp = async (postbackData, lineID) => {
     }
 
     case '項目削除': {
-      message = {
-        type: 'text',
-        text: '項目削除',
-      };
+      try {
+        if ((await numOfSubmissions(lineID)) === '0') {
+          return {
+            type: 'text',
+            text: 'レコードが存在しません',
+          };
+        }
+        message = {
+          type: 'text',
+          text: `削除したいレコード番号を指定してください\n\n${await displaySubmissionList(lineID)}`,
+        };
+        pool.query({
+          text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+          values: ['delete', lineID],
+        });
+      } catch (err) {
+        console.log(err);
+        initContext(lineID);
+      }
       break;
     }
 
     case 'その他': {
       message = {
         type: 'text',
-        text: 'coming soon',
+        text: 'その他 機能一覧',
+        quickReply: {
+          items: [
+            {
+              type: 'action',
+              action: {
+                type: 'postback',
+                label: '講義について',
+                data: '講義について',
+              },
+            },
+            {
+              type: 'action',
+              action: {
+                type: 'postback',
+                label: '開発中！',
+                data: '開発中1',
+              },
+            },
+            {
+              type: 'action',
+              action: {
+                type: 'postback',
+                label: '開発中！',
+                data: '開発中2',
+              },
+            },
+          ],
+        },
       };
       break;
     }
@@ -421,7 +642,7 @@ const tmp = async (postbackData, lineID) => {
       break;
     }
 
-    case '講義の口コミ': {
+    case 'reviewsからselectする処理はじめ': {
       const res = await displayLecturesList();
       pool.query({
         text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
@@ -429,23 +650,33 @@ const tmp = async (postbackData, lineID) => {
       });
       return {
         type: 'text',
-        text: `${res}\n\nどの講義の口コミを参照しますか。講義コードを送信してください。例: FU03`,
+        text: `${res}\n\nどの講義の口コミを参照しますか。講義コードを送信してください。\n例: FU03`,
       };
     }
-    case '口コミを投稿する': {
+    case 'reviewsにinsertする処理はじめ': {
+      const res = await displayLecturesList();
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['reviewStep1', lineID],
+      });
       message = {
         type: 'text',
-        text: 'どの講義への口コミを投稿しますか',
+        text: `${res}どの講義への口コミを投稿しますか。以下の形式で評価を送信して下さい。\n形式: 講義コード コメント 評価スコア(0~5)\n例1: MA02 明らかに楽しい 5`,
       };
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2',
+        values: ['commentpush', lineID],
+      });
       break;
     }
-    case '自分の投稿を編集する': {
+    case 'reviewsにupdateする処理はじめ': {
       message = {
         type: 'text',
         text: '開発中です!',
       };
       break;
     }
+
     case '講義について': {
       message = {
         type: 'text',
@@ -456,16 +687,16 @@ const tmp = async (postbackData, lineID) => {
               type: 'action',
               action: {
                 type: 'postback',
-                label: '講義の口コミ',
-                data: '講義の口コミ',
+                label: '講義の評価を見る',
+                data: 'reviewsからselectする処理はじめ',
               },
             },
             {
               type: 'action',
               action: {
                 type: 'postback',
-                label: '口コミを投稿する',
-                data: '口コミを投稿する',
+                label: '講義の評価を投稿する',
+                data: 'reviewsにinsertする処理はじめ',
               },
             },
             {
@@ -473,7 +704,7 @@ const tmp = async (postbackData, lineID) => {
               action: {
                 type: 'postback',
                 label: '自分の投稿を編集する',
-                data: '自分の投稿を編集する',
+                data: 'reviewsにupdateする処理はじめ',
               },
             },
           ],
