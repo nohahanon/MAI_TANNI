@@ -1,3 +1,4 @@
+/* eslint-disable linebreak-style */
 import axios from 'axios';
 import ical from 'ical';
 import Pool from 'pg-pool';
@@ -40,7 +41,16 @@ async function displaySubmissionList(lineID) {
     values: [lineID],
   });
   let buf = '';
-  for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
+  for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name.trim()}\n`;
+  return buf;
+}
+async function displayCommentList(lectureid) {
+  const res = await pool.query({
+    text: 'SELECT comment FROM reviews WHERE lecturecode = $1',
+    values: [lectureid],
+  });
+  let buf = '';
+  for (let i = 0; i < res.rows.length; i += 1)buf += `${res.rows[i].comment.trim()}\n\n`;
   return buf;
 }
 
@@ -196,6 +206,7 @@ export const textEvent = async (event, client) => {
     text: 'SELECT url FROM users WHERE lineid = $1;',
     values: [lineID],
   });
+
   let message;
 
   // url更新処理
@@ -250,7 +261,6 @@ export const textEvent = async (event, client) => {
           text: 'UPDATE users SET context = $1 WHERE lineID = $2;',
           values: [null, lineID],
         });
-        // lectureCode, deadline, nameが必要
         pool.query({
           text: 'INSERT INTO submissions (lectureCode, deadline, name, lineid) VALUES ($1, CURRENT_TIMESTAMP + \'7 day\', $2, $3);',
           values: ['MYTASK', event.message.text, lineID],
@@ -260,7 +270,24 @@ export const textEvent = async (event, client) => {
           text: 'タスクを追加しました',
         };
       }
-      default: break;
+      case 'reviewStep1': {
+        const lectureCodeCriteria = 8;
+        initContext(lineID);
+        if (!Number.isNaN(event.message.text) && event.message.text.length <= lectureCodeCriteria) {
+          return {
+            type: 'text',
+            text: `${await displayCommentList(event.message.text)}`,
+          };
+        }
+        // このメッセージが返らない
+        message = {
+          type: 'text',
+          text: 'はじめからやりなおしてください',
+        };
+        break;
+      }
+      default:
+        break;
     }
   } catch (err) {
     console.log(err);
@@ -488,7 +515,7 @@ export const textEvent = async (event, client) => {
     case 'その他': {
       message = {
         type: 'text',
-        text: '機能を選択してください',
+        text: 'その他 機能一覧',
         quickReply: {
           items: [
             {

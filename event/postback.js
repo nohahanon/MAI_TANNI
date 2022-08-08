@@ -1,3 +1,4 @@
+/* eslint-disable linebreak-style */
 import Pool from 'pg-pool';
 
 const pool = new Pool({
@@ -456,7 +457,7 @@ const tmp = async (postbackData, lineID) => {
               type: 'action',
               action: {
                 type: 'postback',
-                label: '講義の口コミ',
+                label: '講義の評価を見る',
                 data: '講義の口コミ',
               },
             },
@@ -464,7 +465,7 @@ const tmp = async (postbackData, lineID) => {
               type: 'action',
               action: {
                 type: 'postback',
-                label: '口コミを投稿する',
+                label: '講義の評価を投稿する',
                 data: '口コミを投稿する',
               },
             },

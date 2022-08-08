@@ -1,3 +1,4 @@
+/* eslint-disable linebreak-style */
 // モジュール読み込み
 import line from '@line/bot-sdk';
 import crypto from 'crypto';
