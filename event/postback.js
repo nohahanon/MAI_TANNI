@@ -295,67 +295,98 @@ const tmp = async (postbackData, lineID) => {
     case 'HELP': {
       // 返信するメッセージを作成
       message = {
-        type: 'text',
-        text: 'どのHELPを読みますか？',
-        quickReply: {
-          items: [
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: 'リスト取得HELP',
-                label: 'リスト取得',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'HELP',
+                size: 'xxl',
+                color: '#000000',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: '項目追加HELP',
-                label: '項目追加',
+              {
+                type: 'text',
+                text: '読みたい項目をタップしてください',
+                color: '#222222',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: 'カレンダー登録HELP',
-                label: 'カレンダー登録',
+            ],
+            margin: 'none',
+            backgroundColor: '#38572955',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'リスト取得',
+                  data: 'リスト取得HELP',
+                },
+                height: 'sm',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: '項目削除HELP',
-                label: '項目削除',
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: '項目追加',
+                  data: '項目追加HELP',
+                },
+                height: 'sm',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: 'その他HELP',
-                label: 'その他',
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'カレンダー登録',
+                  data: 'カレンダー登録HELP',
+                },
+                height: 'sm',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: 'リポジトリHELP',
-                label: 'リポジトリ',
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: '項目削除',
+                  data: '項目削除HELP',
+                },
+                height: 'sm',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: 'TwitterHELP',
-                label: 'Twitter',
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'その他',
+                  data: 'その他HELP',
+                },
+                height: 'sm',
               },
-            },
-          ],
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'リポジトリ',
+                  data: 'リポジトリHELP',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'Twitter',
+                  data: 'TwitterHELP',
+                },
+                height: 'sm',
+              },
+            ],
+          },
         },
       };
       break;
