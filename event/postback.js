@@ -763,7 +763,7 @@ const tmp = async (postbackData, lineID) => {
       break;
     }
 
-    // "wrap": true, でtextを自動改行
+    // "wrap": true, でtextを自動改行できます
     case 'リスト取得HELP': {
       message = {
         type: 'flex',
