@@ -58,9 +58,58 @@ async function displayLecturesList() {
   const res = await pool.query({
     text: 'SELECT * FROM lectures;',
   });
-  let buf = '';
-  for (let i = 0; i < res.rows.length; i += 1)buf += `${res.rows[i].code.trim()}: ${res.rows[i].name.trim()}\n`;
-  return buf;
+  const carousel = {
+    type: 'carousel',
+    contents: [],
+  };
+  const bubble = {
+    type: 'bubble',
+    size: 'giga',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [],
+      spacing: 'sm',
+      paddingAll: '13px',
+      width: '150%',
+    },
+  };
+  const box = {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [],
+  };
+  const lectureName = {
+    type: 'text',
+    text: '',
+  };
+  const lectureCode = {
+    type: 'text',
+    text: '',
+    align: 'end',
+  };
+  const numMaxContents = 15;
+  const resRowsLength = res.rows.length;
+  for (let i = 0; i <= resRowsLength / numMaxContents; i += 1) {
+    const bubbleClone = { ...bubble };
+    for (let j = 0; j < numMaxContents; j += 1) {
+      const idx = i * numMaxContents + j;
+      if (idx === resRowsLength) return carousel;
+      const boxClone = { ...box };
+      const lectureNameClone = { ...lectureName };
+      const lectureCodeClone = { ...lectureCode };
+      lectureNameClone.text = `${res.rows[idx].name.substr(0, 25).trim()}`;
+      lectureCodeClone.text = `${res.rows[i].code.trim()}`;
+      boxClone.contents.push(lectureNameClone);
+      boxClone.contents.push(lectureCodeClone);
+      bubbleClone.body.contents.push(boxClone);
+    }
+    carousel.contents.push(bubbleClone);
+  }
+  // return carousel;
+  // let buf = '';
+  // for (let i = 0; i < res.rows.length; i += 1)buf += `${res.rows[i].code.trim()}: ${res.rows[i].name.trim()}\n`;
+  // return buf;
 }
 
 // displaySubmissionListFlex()のためにオブジェクトに格納する文字列を成型します
@@ -653,10 +702,12 @@ const tmp = async (postbackData, lineID) => {
         text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
         values: ['reviewStep1', lineID],
       });
+      console.log(res);
       return {
         type: 'text',
         text: `${res}\n\nどの講義の口コミを参照しますか。講義コードを送信してください。\n例: FU03`,
       };
+      // return res;
     }
     case 'reviewsにinsertする処理はじめ': {
       const res = await displayLecturesList();
