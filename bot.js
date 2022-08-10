@@ -77,7 +77,7 @@ export const index = (req, res) => {
           message = followFunc();
           pool.query({
             text: 'INSERT INTO users (lineID) VALUES ($1);',
-            values: [event.sorce.userId],
+            values: [event.source.userId],
           });
           break;
         }
@@ -87,7 +87,7 @@ export const index = (req, res) => {
           unfollowFunc(event);
           pool.query({
             text: 'DELETE FROM users WHERE lineID = $1',
-            values: [event.sorce.userId],
+            values: [event.source.userId],
           });
           break;
         }
@@ -98,7 +98,7 @@ export const index = (req, res) => {
           pool.query({
             text: 'INSERT INTO users (lineID) VALUES ($1);',
             values: [event.sorce.userId],
-          }); 
+          });
           break;
         }
         case 'memberLeft': {
