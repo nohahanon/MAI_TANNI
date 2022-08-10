@@ -28,17 +28,6 @@ function repeatDelete() {
   });
 }
 
-// submissionsから一覧を取得して表示する文字列を返す関数
-async function displaySubmissionList(lineID) {
-  const res = await pool.query({
-    text: 'SELECT name, lectureCode FROM submissions WHERE lineID = $1',
-    values: [lineID],
-  });
-  let buf = '';
-  for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name.trim()}\n`;
-  return buf;
-}
-
 function initContext(lineID) {
   pool.query({
     text: 'UPDATE users SET context = null WHERE lineid = $1;',
@@ -54,13 +43,100 @@ async function numOfSubmissions(lineID) {
   return res.rows[0].count;
 }
 
+async function numOfComments(lineID) {
+  const res = await pool.query({
+    text: 'SELECT COUNT(*) FROM reviews WHERE userid = $1',
+    values: [lineID],
+  });
+  return res.rows[0].count;
+}
+
 async function displayLecturesList() {
   const res = await pool.query({
     text: 'SELECT * FROM lectures;',
   });
-  let buf = '';
-  for (let i = 0; i < res.rows.length; i += 1)buf += `${res.rows[i].code.trim()}: ${res.rows[i].name.trim()}\n`;
-  return buf;
+  const carousel = {
+    type: 'carousel',
+    contents: [],
+  };
+  // caraucelのcontentsにpushしてカルーセル内における一つのバブルとなる
+  const bubble = {
+    type: 'bubble',
+    size: 'giga',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [],
+      spacing: 'sm',
+      paddingAll: '13px',
+    },
+  };
+  // lectureNameとlectureCodeをcontentsにpushしてバブル内における一つの行とする
+  const box = {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [],
+  };
+
+  const lectureName = {
+    type: 'box',
+    layout: 'vertical',
+    contents: [{
+      type: 'text',
+      size: 'xs',
+      text: '',
+      wrap: true,
+    }],
+    width: '75%',
+  };
+  const lectureCode = {
+    type: 'box',
+    layout: 'vertical',
+    contents: [{
+      type: 'text',
+      text: '',
+      wrap: true,
+      align: 'end',
+      size: 'xs',
+    }],
+    width: '25%',
+  };
+  const numMaxContents = 15;
+  const carousel1 = JSON.parse(JSON.stringify(carousel));
+  const carousel2 = JSON.parse(JSON.stringify(carousel));
+  const tmp = [];
+  for (let i = 0; i < res.rows.length; i += 1) {
+    const boxClone = JSON.parse(JSON.stringify(box));
+    const lectureNameClone = JSON.parse(JSON.stringify(lectureName));
+    const lectureCodeClone = JSON.parse(JSON.stringify(lectureCode));
+    lectureNameClone.contents[0].text = `${res.rows[i].name.trim()}`;
+    lectureCodeClone.contents[0].text = `${res.rows[i].code.trim()}`;
+    boxClone.contents.push(lectureNameClone);
+    boxClone.contents.push(lectureCodeClone);
+    tmp.push(boxClone);
+  }
+  let bubbleClone = JSON.parse(JSON.stringify(bubble));
+  tmp.sort((a, b) => (a.contents[1].contents[0].text > b.contents[1].contents[0].text ? 1 : -1));
+  for (let i = 0; i < tmp.length; i += 1) {
+    bubbleClone.body.contents.push(tmp[i]);
+    if ((i + 1) % numMaxContents === 0) {
+      if (i < (tmp.length) / 2) carousel1.contents.push(bubbleClone);
+      else carousel2.contents.push(bubbleClone);
+      bubbleClone = JSON.parse(JSON.stringify(bubble));
+    }
+  }
+  carousel2.contents.push(bubbleClone);
+
+  return [{
+    type: 'flex',
+    altText: 'this is a flex message',
+    contents: carousel1,
+  },
+  {
+    type: 'flex',
+    altText: 'this is a flex message',
+    contents: carousel2,
+  }];
 }
 
 // displaySubmissionListFlex()のためにオブジェクトに格納する文字列を成型します
@@ -148,12 +224,14 @@ async function displaySubmissionListFlex(lineID) {
         size: 'xs',
         color: '#555555',
         flex: 0,
+        wrap: true,
       },
       {
         type: 'text',
         text: '',
         size: 'xxs',
         color: '#111111',
+        wrap: true,
         align: 'end',
       },
     ],
@@ -167,6 +245,7 @@ async function displaySubmissionListFlex(lineID) {
         text: '',
         size: 'xs',
         color: '#555555',
+        wrap: true,
         flex: 0,
       },
     ],
@@ -176,9 +255,119 @@ async function displaySubmissionListFlex(lineID) {
   ).concat(
     [separator],
   ).concat(
-    resOther.rows.map((t, i) => subFuncFlex(t, i, boxForLecture)),
+    resOther.rows.map((t, i) => subFuncFlex(t, i + resMyTask.rows.length, boxForLecture)),
   ));
   return model;
+}
+
+async function displayCommentListFlex(lineID) {
+  const res = await pool.query({
+    text: 'SELECT reviewid, comment, evaluationscore, lecturecode FROM reviews WHERE userid = $1',
+    values: [lineID],
+  });
+  const boxParent = {
+    type: 'bubble',
+    size: 'giga',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        {
+          type: 'text',
+          text: 'Comment List',
+          weight: 'bold',
+          color: '#1DB446',
+          size: 'sm',
+        },
+        {
+          type: 'separator',
+          margin: 'xxl',
+        },
+        {
+          type: 'box',
+          layout: 'vertical',
+          margin: 'xxl',
+          spacing: 'sm',
+          contents: [],
+        },
+        {
+          type: 'separator',
+          margin: 'xxl',
+        },
+      ],
+    },
+    styles: {
+      footer: {
+        separator: true,
+      },
+    },
+  };
+  const boxChilde = {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      {
+        type: 'text',
+        text: '',
+        size: 'xs',
+        color: '#555555',
+        flex: 0,
+        margin: 'md',
+      },
+      {
+        type: 'separator',
+        margin: 'md',
+      },
+      {
+        type: 'text',
+        text: '',
+        size: 'xs',
+        color: '#555555',
+        flex: 0,
+        margin: 'md',
+      },
+      {
+        type: 'separator',
+        margin: 'md',
+      },
+      {
+        type: 'text',
+        text: '',
+        size: 'xs',
+        flex: 0,
+        margin: 'md',
+        color: '#555555',
+      },
+      {
+        type: 'separator',
+        margin: 'md',
+      },
+      {
+        type: 'text',
+        size: 'xs',
+        text: '',
+        color: '#555555',
+        flex: 0,
+        margin: 'md',
+        wrap: true,
+      },
+    ],
+  };
+  let boxChildClone = JSON.parse(JSON.stringify(boxChilde));
+  boxChildClone.contents[0].text = 'コメント番号';
+  boxChildClone.contents[2].text = '評価スコア';
+  boxChildClone.contents[4].text = '講義コード';
+  boxChildClone.contents[6].text = 'コメント';
+  boxParent.body.contents.splice(2, 0, boxChildClone);
+  for (let i = 0; i < res.rows.length; i += 1) {
+    boxChildClone = JSON.parse(JSON.stringify(boxChilde));
+    boxChildClone.contents[0].text = res.rows[i].reviewid.toString();
+    boxChildClone.contents[2].text = res.rows[i].evaluationscore.toString();
+    boxChildClone.contents[4].text = res.rows[i].lecturecode.trim();
+    boxChildClone.contents[6].text = res.rows[i].comment.trim();
+    boxParent.body.contents[3].contents.push(boxChildClone);
+  }
+  return boxParent;
 }
 
 const tmp = async (postbackData, lineID) => {
@@ -246,10 +435,17 @@ const tmp = async (postbackData, lineID) => {
             text: 'レコードが存在しません',
           };
         }
-        message = {
-          type: 'text',
-          text: `削除したいレコード番号を指定してください\n\n${await displaySubmissionList(lineID)}`,
-        };
+        message = [
+          {
+            type: 'flex',
+            altText: 'Flex Message',
+            contents: await displaySubmissionListFlex(lineID),
+          },
+          {
+            type: 'text',
+            text: '削除したいレコード番号を指定してください',
+          }];
+        console.log(message);
         pool.query({
           text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
           values: ['delete', lineID],
@@ -263,35 +459,63 @@ const tmp = async (postbackData, lineID) => {
 
     case 'その他': {
       message = {
-        type: 'text',
-        text: 'その他 機能一覧',
-        quickReply: {
-          items: [
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                label: '講義について',
-                data: '講義について',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'その他 機能一覧',
+                size: 'xxl',
+                color: '#000000',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                label: '開発中！',
-                data: '開発中1',
+              {
+                type: 'text',
+                text: '使いたい機能の項目をタップしてください',
+                wrap: true,
+                color: '#222222',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                label: '開発中！',
-                data: '開発中2',
+            ],
+            margin: 'none',
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: '講義について',
+                  data: '講義について',
+                },
+                height: 'sm',
               },
-            },
-          ],
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: '開発中！',
+                  data: '開発中1',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: '開発中！',
+                  data: '開発中2',
+                },
+                height: 'sm',
+              },
+            ],
+          },
         },
       };
       break;
@@ -682,68 +906,139 @@ const tmp = async (postbackData, lineID) => {
       const res = await displayLecturesList();
       pool.query({
         text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
-        values: ['reviewStep1', lineID],
+        values: ['commentreview', lineID],
       });
-      return {
+      res.push({
         type: 'text',
-        text: `${res}\n\nどの講義の口コミを参照しますか。講義コードを送信してください。\n例: FU03`,
-      };
+        text: 'どの講義の口コミを参照しますか。講義コードを送信してください。\n例: FU03',
+      });
+      return res;
     }
     case 'reviewsにinsertする処理はじめ': {
       const res = await displayLecturesList();
       pool.query({
-        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
-        values: ['reviewStep1', lineID],
-      });
-      message = {
-        type: 'text',
-        text: `${res}どの講義への口コミを投稿しますか。以下の形式で評価を送信して下さい。\n形式: 講義コード コメント 評価スコア(0~5)\n例1: MA02 明らかに楽しい 5`,
-      };
-      pool.query({
         text: 'UPDATE users SET context = $1 WHERE lineid = $2',
         values: ['commentpush', lineID],
       });
-      break;
+      res.push({
+        type: 'text',
+        text: 'どの講義への口コミを投稿しますか。以下の形式で評価を送信して下さい。\n形式: 講義コード コメント 評価スコア(0~5)\n例1: MA02 明らかに楽しい 5',
+      });
+      return res;
     }
     case 'reviewsにupdateする処理はじめ': {
-      message = {
+      if ((await numOfComments(lineID)) === '0') {
+        return {
+          type: 'text',
+          text: 'あなたが投稿したコメントは存在しないようです',
+        };
+      }
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2',
+        values: ['commentupdata', lineID],
+      });
+      message = [{
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: await displayCommentListFlex(lineID),
+      },
+      {
         type: 'text',
-        text: '開発中です!',
-      };
-      break;
+        text: 'どのコメントを修正しますか。以下の形式で送信してください。\n形式: コメント番号 評価スコア(0~5) コメント\n例1: 1 本質的に明らかに楽しい 5',
+      }];
+      return message;
     }
-
+    case 'reviewsにdeleteする処理はじめ': {
+      if ((await numOfComments(lineID)) === '0') {
+        return {
+          type: 'text',
+          text: 'あなたが投稿したコメントは存在しないようです',
+        };
+      }
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2',
+        values: ['commentdelete', lineID],
+      });
+      message = [{
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: await displayCommentListFlex(lineID),
+      },
+      {
+        type: 'text',
+        text: 'どのコメントを削除しますか。以下の形式で送信してください。\n形式: コメント番号\n例1: 1\n例2: 8',
+      }];
+      return message;
+    }
     case '講義について': {
       message = {
-        type: 'text',
-        text: '機能を選択してください',
-        quickReply: {
-          items: [
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                label: '講義の評価を見る',
-                data: 'reviewsからselectする処理はじめ',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '講義について\n機能一覧',
+                size: 'xxl',
+                wrap: true,
+                color: '#000000',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                label: '講義の評価を投稿する',
-                data: 'reviewsにinsertする処理はじめ',
+              {
+                type: 'text',
+                text: '使いたい機能の項目をタップしてください',
+                wrap: true,
+                color: '#222222',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                label: '自分の投稿を編集する',
-                data: 'reviewsにupdateする処理はじめ',
+            ],
+            margin: 'none',
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: '講義の評価を見る',
+                  data: 'reviewsからselectする処理はじめ',
+                },
+                height: 'sm',
               },
-            },
-          ],
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: '講義の評価を投稿する',
+                  data: 'reviewsにinsertする処理はじめ',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: '自分の投稿を編集する',
+                  data: 'reviewsにupdateする処理はじめ',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: '自分の投稿を削除する',
+                  data: 'reviewsにdeleteする処理はじめ',
+                },
+                height: 'sm',
+              },
+            ],
+          },
         },
       };
       break;
