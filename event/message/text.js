@@ -175,7 +175,7 @@ export const textEvent = async (event, client) => {
       });
       message = {
         type: 'text',
-        text: (await now).rows[0],
+        text: (await now).rows[0].now,
       };
       break;
     }
