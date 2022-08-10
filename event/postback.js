@@ -9,6 +9,25 @@ const pool = new Pool({
   port: process.env.pgPort,
 });
 
+async function repeatSelect() {
+  const res = await pool.query({
+    text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval \'7 day\';',
+  });
+  console.log(res);
+  let buf = '';
+  for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
+  return {
+    type: 'text',
+    text: `${buf}`,
+  };
+}
+
+function repeatDelete() {
+  pool.query({
+    text: 'DELETE FROM submissions WHERE deadline < now();',
+  });
+}
+
 // submissionsから一覧を取得して表示する文字列を返す関数
 async function displaySubmissionList(lineID) {
   const res = await pool.query({
@@ -152,16 +171,13 @@ async function displaySubmissionListFlex(lineID) {
       },
     ],
   };
-  const promises1 = await resMyTask.rows.map(async (vls, idx) => {
-    model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForMyTask));
-  });
-  const promises2 = await resOther.rows.map(async (vls, idx) => {
-    model.body.contents[1].contents.push(await subFuncFlex(vls, idx, boxForLecture));
-  });
-  await Promise.all(promises1);
-  model.body.contents[1].contents.push(separator);
-  await Promise.all(promises2);
-  console.log(model.body.contents[1].contents);
+  model.body.contents[1].contents = await Promise.all([].concat(
+    resMyTask.rows.map((t, i) => subFuncFlex(t, i, boxForMyTask)),
+  ).concat(
+    [separator],
+  ).concat(
+    resOther.rows.map((t, i) => subFuncFlex(t, i, boxForLecture)),
+  ));
   return model;
 }
 
@@ -170,22 +186,11 @@ const tmp = async (postbackData, lineID) => {
 
   switch (postbackData) {
     case '定期表示': {
-      const res = await pool.query({
-        text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval \'7 day\';',
-      });
-      console.log(res);
-      let buf = '';
-      for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
-      message = {
-        type: 'text',
-        text: `${buf}`,
-      };
+      message = await repeatSelect();
       break;
     }
     case '定期削除': {
-      pool.query({
-        text: 'DELETE FROM submissions WHERE deadline < now();',
-      });
+      repeatDelete();
       break;
     }
     case 'リスト取得': {
