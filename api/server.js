@@ -17,7 +17,7 @@ app.post('/webhook', middleware({
   channelSecret: process.env.channelSecret,
 }), index);
 
-app.post('/interval-execute', (req, res) => {
+app.get('/interval-execute', (req, res) => {
   console.log('正しく叩けているよ!!!\n');
   res.send('正しく叩けているよ！\n');
 });
