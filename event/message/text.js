@@ -74,26 +74,73 @@ export const textEvent = async (event, client) => {
   const urlSample = /^https:\/\/elms.u-aizu.ac.jp\/calendar\/export_execute.php\?userid\=/;
   try {
     switch (await context.rows[0].context) {
-      case 'commentpush': {
-        const data = event.message.text.trim().split(' ');
-        if (data.length === 3
-          && data[0].length <= 8
-          && data[1].length <= 200
-          && parseInt(data[2], 10) >= 0
-          && parseInt(data[2], 10) <= 5) {
+      case 'commentdelete': {
+        const data = event.message.text.trim();
+        if (!Number.isNaN(Number.parseInt(data, 10))) {
           pool.query({
-            text: 'INSERT INTO reviews (userid, comment, lecturecode, evaluationscore) VALUES ($1, $3, $2, $4);',
-            values: [lineID, data[0], data[1], data[2]],
+            text: 'DELETE FROM reviews WHERE reviewid = (SELECT reviewid FROM reviews WHERE userid = $2 LIMIT 1 OFFSET $1);',
+            values: [Number.parseInt(data, 10) - 1, lineID],
           });
           return {
             type: 'text',
-            text: '評価を追加しました',
+            text: '削除しました',
           };
         }
         return {
           type: 'text',
           text: 'はじめからやりなおしてください',
         };
+      }
+      case 'commentupdata': {
+        const data = event.message.text.trim().split(' ');
+        if (data.length === 3
+          && Number.isInteger(Number.parseInt(data[0], 10))
+          && data[2].length <= 200
+          && Number.isInteger(Number.parseInt(data[1], 10))
+          && data[1] <= 5
+          && data[1] >= 0) {
+          pool.query({
+            text: 'UPDATE reviews SET (comment, evaluationscore) = ($3, $4) WHERE reviewid = (SELECT reviewid FROM reviews WHERE userid = $1 LIMIT 1 OFFSET $2)',
+            values:
+              [lineID, Number.parseInt(data[0], 10) - 1, data[2], Number.parseInt(data[1], 10)],
+          });
+          return {
+            type: 'text',
+            text: '更新しました',
+          };
+        }
+        return {
+          type: 'text',
+          text: 'はじめからやりなおしてください',
+        };
+      }
+      case 'commentpush': {
+        try {
+          const data = event.message.text.trim().split(' ');
+          if (data.length === 3
+            && data[0].length <= 8
+            && data[1].length <= 200
+            && parseInt(data[2], 10) >= 0
+            && parseInt(data[2], 10) <= 5) {
+            await pool.query({
+              text: 'INSERT INTO reviews (userid, comment, lecturecode, evaluationscore) VALUES ($1, $3, $2, $4);',
+              values: [lineID, data[0], data[1], data[2]],
+            });
+            return {
+              type: 'text',
+              text: '評価を追加しました',
+            };
+          }
+          return {
+            type: 'text',
+            text: 'はじめからやりなおしてください(一つの講義に対して一つの投稿しかできません！)',
+          };
+        } catch (err) {
+          return {
+            type: 'text',
+            text: 'はじめからやりなおしてください(一つの講義に対して一つの投稿しかできません！)',
+          };
+        }
       }
       case 'push': {
         if (urlSample.test(event.message.text)) {
@@ -142,7 +189,7 @@ export const textEvent = async (event, client) => {
           text: 'タスクを追加しました',
         };
       }
-      case 'reviewStep1': {
+      case 'commentreview': {
         const lectureCodeCriteria = 8;
         const buf = await displayCommentList(event.message.text);
         if (buf !== '' && event.message.text.length <= lectureCodeCriteria) {
@@ -388,10 +435,7 @@ export const textEvent = async (event, client) => {
     // 'おはよう'というメッセージが送られてきた時
     case 'おはよう': {
       // 返信するメッセージを作成
-      message = {
-        type: 'text',
-        text: '朝だよ。お布団が待ってる！',
-      };
+      message = { type: 'text', text: 'おはよう' };
       break;
     }
     // 'こんにちは'というメッセージが送られてきた時
