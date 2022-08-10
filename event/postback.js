@@ -300,67 +300,98 @@ const tmp = async (postbackData, lineID) => {
     case 'HELP': {
       // 返信するメッセージを作成
       message = {
-        type: 'text',
-        text: 'どのHELPを読みますか？',
-        quickReply: {
-          items: [
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: 'リスト取得HELP',
-                label: 'リスト取得',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'HELP',
+                size: 'xxl',
+                color: '#000000',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: '項目追加HELP',
-                label: '項目追加',
+              {
+                type: 'text',
+                text: '読みたい項目をタップしてください',
+                color: '#222222',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: 'カレンダー登録HELP',
-                label: 'カレンダー登録',
+            ],
+            margin: 'none',
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'リスト取得',
+                  data: 'リスト取得HELP',
+                },
+                height: 'sm',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: '項目削除HELP',
-                label: '項目削除',
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: '項目追加',
+                  data: '項目追加HELP',
+                },
+                height: 'sm',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: 'その他HELP',
-                label: 'その他',
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'カレンダー登録',
+                  data: 'カレンダー登録HELP',
+                },
+                height: 'sm',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: 'リポジトリHELP',
-                label: 'リポジトリ',
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: '項目削除',
+                  data: '項目削除HELP',
+                },
+                height: 'sm',
               },
-            },
-            {
-              type: 'action',
-              action: {
-                type: 'postback',
-                data: 'TwitterHELP',
-                label: 'Twitter',
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'その他',
+                  data: 'その他HELP',
+                },
+                height: 'sm',
               },
-            },
-          ],
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'リポジトリ',
+                  data: 'リポジトリHELP',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'Twitter',
+                  data: 'TwitterHELP',
+                },
+                height: 'sm',
+              },
+            ],
+          },
         },
       };
       break;
@@ -732,52 +763,305 @@ const tmp = async (postbackData, lineID) => {
       break;
     }
 
+    // "wrap": true, でtextを自動改行
     case 'リスト取得HELP': {
       message = {
-        type: 'text',
-        text: '7日以内にある課題を表示します',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'HELP: リスト取得',
+                wrap: true,
+                size: 'xl',
+              },
+            ],
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '直近７日の予定を表示します',
+                wrap: true,
+              },
+            ],
+            offsetTop: 'none',
+            offsetBottom: 'none',
+            paddingAll: 'lg',
+            paddingTop: 'lg',
+          },
+        },
       };
       break;
     }
     case '項目追加HELP': {
       message = {
-        type: 'text',
-        text: '予定を追加できます',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'HELP: 項目追加',
+                wrap: true,
+                size: 'xl',
+              },
+            ],
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '予定を追加できます',
+                wrap: true,
+              },
+            ],
+            offsetTop: 'none',
+            offsetBottom: 'none',
+            paddingAll: 'lg',
+            paddingTop: 'lg',
+          },
+        },
       };
       break;
     }
     case 'カレンダー登録HELP': {
       message = {
-        type: 'text',
-        text: 'リスト取得に使うカレンダーを登録できます\n【使用方法】\n1.LMSにアクセス\n2.左上のメニューから"カレンダー"をクリック\n3."カレンダーをエクスポートする"をクリック\n4.URLを取得\n5.BOTの"カレンダー登録"をクリック\n6.URLをペースト',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'HELP: カレンダー登録',
+                wrap: true,
+                size: 'xl',
+              },
+            ],
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'リスト取得に使うカレンダーを登録できます',
+                wrap: true,
+              },
+              {
+                type: 'separator',
+                margin: 'lg',
+              },
+              {
+                type: 'text',
+                text: '1. LMSにアクセス',
+                wrap: true,
+                offsetTop: 'none',
+              },
+              {
+                type: 'text',
+                text: '2. 左上のメニューから"カレンダー"をタップ',
+                wrap: true,
+              },
+              {
+                type: 'text',
+                text: '3. "カレンダーをエクスポートする"をタップ',
+                wrap: true,
+              },
+              {
+                type: 'text',
+                text: '4. URLを取得',
+                wrap: true,
+              },
+              {
+                type: 'text',
+                text: '5. BOTの"カレンダー登録"をタップ',
+                wrap: true,
+              },
+              {
+                type: 'text',
+                text: '6. URLをペーストして送信',
+                wrap: true,
+              },
+            ],
+            offsetTop: 'none',
+            offsetBottom: 'none',
+            paddingAll: 'lg',
+            paddingTop: 'lg',
+          },
+        },
       };
       break;
     }
     case '項目削除HELP': {
       message = {
-        type: 'text',
-        text: 'リストから予定を選択して消せます',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'HELP: 項目削除',
+                wrap: true,
+                size: 'xl',
+              },
+            ],
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '選択した内容をリストから削除できます',
+                wrap: true,
+              },
+            ],
+            offsetTop: 'none',
+            offsetBottom: 'none',
+            paddingAll: 'lg',
+            paddingTop: 'lg',
+          },
+        },
       };
       break;
     }
     case 'その他HELP': {
       message = {
-        type: 'text',
-        text: '今後機能が追加されるかも？\n開発チーム次第です',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'HELP: その他',
+                wrap: true,
+                size: 'xl',
+              },
+            ],
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '追加された機能を使用することができます',
+                wrap: true,
+              },
+            ],
+            offsetTop: 'none',
+            offsetBottom: 'none',
+            paddingAll: 'lg',
+            paddingTop: 'lg',
+          },
+        },
       };
       break;
     }
     case 'リポジトリHELP': {
       message = {
-        type: 'text',
-        text: 'githubのリンクに飛べます',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'HELP: リポジトリ',
+                wrap: true,
+                size: 'xl',
+              },
+            ],
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'このLINEBOTのコードを見ることができます',
+                wrap: true,
+              },
+            ],
+            offsetTop: 'none',
+            offsetBottom: 'none',
+            paddingAll: 'lg',
+            paddingTop: 'lg',
+          },
+        },
       };
       break;
     }
     case 'TwitterHELP': {
       message = {
-        type: 'text',
-        text: '開発チーム&メンターのtwitterです',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'HELP: Twitter',
+                wrap: true,
+                size: 'xl',
+              },
+            ],
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '開発者&メンターのTwitterにアクセスできます',
+                wrap: true,
+              },
+            ],
+            offsetTop: 'none',
+            offsetBottom: 'none',
+            paddingAll: 'lg',
+            paddingTop: 'lg',
+          },
+        },
       };
       break;
     }
