@@ -166,9 +166,19 @@ export const textEvent = async (event, client) => {
   }
 
   let message;
-
   // メッセージのテキストごとに条件分岐
   switch (event.message.text) {
+    case 'DBTest': {
+      const now = pool.query({
+        text: 'SELECT NOW();',
+        values: [],
+      });
+      message = {
+        type: 'text',
+        text: (await now).rows[0],
+      };
+      break;
+    }
     case 'insertTolectures': {
       const dt = ['HS04 言語学',
         'HS05 文学',
