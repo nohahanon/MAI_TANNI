@@ -85,8 +85,8 @@ export const textEvent = async (event, client) => {
         const data = event.message.text.trim();
         if (!Number.isNaN(Number.parseInt(data, 10))) {
           pool.query({
-            text: 'DELETE FROM reviews WHERE reviewid = (SELECT reviewid FROM reviews WHERE userid = $2 LIMIT 1 OFFSET $1);',
-            values: [Number.parseInt(data, 10) - 1, lineID],
+            text: 'DELETE FROM reviews WHERE reviewid = $1;',
+            values: [Number.parseInt(data, 10)],
           });
           return {
             type: 'text',
@@ -106,10 +106,11 @@ export const textEvent = async (event, client) => {
           && Number.isInteger(Number.parseInt(data[1], 10))
           && data[1] <= 5
           && data[1] >= 0) {
+          console.log(data);
           pool.query({
-            text: 'UPDATE reviews SET (comment, evaluationscore) = ($3, $4) WHERE reviewid = (SELECT reviewid FROM reviews WHERE userid = $1 LIMIT 1 OFFSET $2)',
+            text: 'UPDATE reviews SET (comment, evaluationscore) = ($1, $2) WHERE reviewid = $3',
             values:
-              [lineID, Number.parseInt(data[0], 10) - 1, data[2], Number.parseInt(data[1], 10)],
+              [data[2], Number.parseInt(data[1], 10), Number.parseInt(data[0], 10)],
           });
           return {
             type: 'text',

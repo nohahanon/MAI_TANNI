@@ -154,7 +154,6 @@ async function subFuncFlex(vls, idx, box) {
   } else {
     boxTmp.contents[0].text = `${idx + 1}:${vls.name}`;
   }
-  console.log(vls);
   // lecturecodeが'MYTASK'の場合lecturesに聞いても何も返らないため、''を自力で代入する
   if (vls.lecturecode.trim() !== 'MYTASK') {
     boxTmp.contents[1].text = `${resLectureName.rows[0].name}`;
@@ -285,11 +284,57 @@ async function displayCommentListFlex(lineID) {
           layout: 'vertical',
           margin: 'xxl',
           spacing: 'sm',
-          contents: [],
-        },
-        {
-          type: 'separator',
-          margin: 'xxl',
+          contents: [{
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: 'コメント番号',
+                size: 'xs',
+                color: '#555555',
+                flex: 0,
+                margin: 'md',
+              },
+              {
+                type: 'separator',
+                margin: 'md',
+              },
+              {
+                type: 'text',
+                text: '評価スコア',
+                size: 'xs',
+                color: '#555555',
+                flex: 0,
+                margin: 'md',
+              },
+              {
+                type: 'separator',
+                margin: 'md',
+              },
+              {
+                type: 'text',
+                text: '講義コード',
+                size: 'xs',
+                flex: 0,
+                margin: 'md',
+                color: '#555555',
+              },
+              {
+                type: 'separator',
+                margin: 'md',
+              },
+              {
+                type: 'text',
+                size: 'xs',
+                text: 'コメント',
+                color: '#555555',
+                flex: 0,
+                margin: 'md',
+                wrap: true,
+              },
+            ],
+          }],
         },
       ],
     },
@@ -350,19 +395,13 @@ async function displayCommentListFlex(lineID) {
       },
     ],
   };
-  let boxChildClone = JSON.parse(JSON.stringify(boxChilde));
-  boxChildClone.contents[0].text = 'コメント番号';
-  boxChildClone.contents[2].text = '評価スコア';
-  boxChildClone.contents[4].text = '講義コード';
-  boxChildClone.contents[6].text = 'コメント';
-  boxParent.body.contents.splice(2, 0, boxChildClone);
   for (let i = 0; i < res.rows.length; i += 1) {
-    boxChildClone = JSON.parse(JSON.stringify(boxChilde));
+    const boxChildClone = JSON.parse(JSON.stringify(boxChilde));
     boxChildClone.contents[0].text = res.rows[i].reviewid.toString();
     boxChildClone.contents[2].text = res.rows[i].evaluationscore.toString();
     boxChildClone.contents[4].text = res.rows[i].lecturecode.trim();
     boxChildClone.contents[6].text = res.rows[i].comment.trim();
-    boxParent.body.contents[3].contents.push(boxChildClone);
+    boxParent.body.contents[2].contents.push(boxChildClone);
   }
   return boxParent;
 }
