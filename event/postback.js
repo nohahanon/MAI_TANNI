@@ -148,7 +148,7 @@ async function subFuncFlex(vls, idx, box) {
   // 文字列がzenkakuCriteria以上の長さの全角文字列の場合抑える
   // 文字列がhankakuCriteria以上の長さの半角文字列の場合抑える
   if (zenOrHan.test(vls.name) && vls.name.length > zenkakuCriteria) {
-    boxTmp.contents[0].text = `${idx + 1}:${vls.nameqsubstr(0, zenkakuCriteria)}...`;
+    boxTmp.contents[0].text = `${idx + 1}:${vls.name.substr(0, zenkakuCriteria)}...`;
   } else if (!zenOrHan.test(vls.name) && vls.name.length > hankakuCriteria) {
     boxTmp.contents[0].text = `${idx + 1}:${vls.name.substr(0, hankakuCriteria)}...`;
   } else {
@@ -158,8 +158,6 @@ async function subFuncFlex(vls, idx, box) {
   if (vls.lecturecode.trim() !== 'MYTASK') {
     boxTmp.contents[1].text = `${resLectureName.rows[0].name}`;
   }
-  // console.log(boxTmp);
-  // tar.push(boxTmp);
   return boxTmp;
 }
 
