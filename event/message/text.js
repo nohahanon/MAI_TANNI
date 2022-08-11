@@ -37,16 +37,23 @@ async function processCalender(url, lineID) {
     // db(submissionsとUsersLectures)の更新
     for (let i = 0; i < data.length; i += 1) {
       // submissionの更新
-      pool.query({
-        text: 'INSERT INTO submissions (lectureCode, deadline, name, lineID) VALUES ($1, TO_TIMESTAMP($2, $3), $4, $5);',
-        values: [data[i].categories[0].split('_')[0], convertZuluToJST(data[i].end), 'YYYY-MM-DD T1:MI:SS', data[i].summary, lineID],
-      });
-      // userslecturesの更新
-      // 知らない組み合わせを得たら更新する
-      pool.query({
-        text: 'INSERT INTO UsersLectures SELECT $1, $2 WHERE NOT EXISTS (SELECT * FROM UsersLectures WHERE lineID = $1 AND lectureCode = $2)',
-        values: [lineID, data[i].categories[0].split('_')[0]],
-      });
+      if (data[i].categories[0] !== undefined) {
+        pool.query({
+          text: 'INSERT INTO submissions (lectureCode, deadline, name, lineID) VALUES ($1, TO_TIMESTAMP($2, $3), $4, $5);',
+          values: [data[i].categories[0].split('_')[0], convertZuluToJST(data[i].end), 'YYYY-MM-DD T1:MI:SS', data[i].summary, lineID],
+        });
+        // userslecturesの更新
+        // 知らない組み合わせを得たら更新する
+        pool.query({
+          text: 'INSERT INTO UsersLectures SELECT $1, $2 WHERE NOT EXISTS (SELECT * FROM UsersLectures WHERE lineID = $1 AND lectureCode = $2)',
+          values: [lineID, data[i].categories[0].split('_')[0]],
+        });
+      } else {
+        pool.query({
+          text: 'INSERT INTO submissions (lectureCode, deadline, name, lineID) VALUES ($1, TO_TIMESTAMP($2, $3), $4, $5);',
+          values: ['MYTASK', convertZuluToJST(data[i].end), 'YYYY-MM-DD T1:MI:SS', data[i].summary, lineID],
+        });
+      }
     }
   } catch (err) { console.log(err); }
 }

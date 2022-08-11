@@ -154,6 +154,7 @@ async function subFuncFlex(vls, idx, box) {
   } else {
     boxTmp.contents[0].text = `${idx + 1}:${vls.name}`;
   }
+  console.log(vls);
   // lecturecodeが'MYTASK'の場合lecturesに聞いても何も返らないため、''を自力で代入する
   if (vls.lecturecode.trim() !== 'MYTASK') {
     boxTmp.contents[1].text = `${resLectureName.rows[0].name}`;
