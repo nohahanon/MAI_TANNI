@@ -65,7 +65,7 @@ async function displayCommentList(lectureid) {
   });
   let buf = '';
   for (let i = 0; i < res.rows.length; i += 1)buf += `${res.rows[i].comment.trim()}\n\n`;
-  return buf;
+  return [buf, res.rows.length];
 }
 
 // テキストメッセージの処理をする関数
@@ -90,12 +90,12 @@ export const textEvent = async (event, client) => {
           });
           return {
             type: 'text',
-            text: '削除しました',
+            text: '指定したタスクを削除しました！',
           };
         }
         return {
           type: 'text',
-          text: 'はじめからやりなおしてください',
+          text: '形式が誤っているようです！はじめからやりなおしてください！',
         };
       }
       case 'commentupdata': {
@@ -113,12 +113,12 @@ export const textEvent = async (event, client) => {
           });
           return {
             type: 'text',
-            text: '更新しました',
+            text: '指定した投稿を更新しました！',
           };
         }
         return {
           type: 'text',
-          text: 'はじめからやりなおしてください',
+          text: '形式が誤っているようです！もう一度やり直してください！',
         };
       }
       case 'commentpush': {
@@ -135,17 +135,17 @@ export const textEvent = async (event, client) => {
             });
             return {
               type: 'text',
-              text: '評価を追加しました',
+              text: '講義への評価を追加しました！',
             };
           }
           return {
             type: 'text',
-            text: 'はじめからやりなおしてください(一つの講義に対して一つの投稿しかできません！)',
+            text: '一つの講義に対して一つの投稿しかできません！別の講義について書くか、修正機能で追記しましょう！',
           };
         } catch (err) {
           return {
             type: 'text',
-            text: 'はじめからやりなおしてください(一つの講義に対して一つの投稿しかできません！)',
+            text: '一つの講義に対して一つの投稿しかできません！別の講義について書くか、修正機能で追記しましょう！',
           };
         }
       }
@@ -158,12 +158,12 @@ export const textEvent = async (event, client) => {
           processCalender(event.message.text, lineID);
           return {
             type: 'text',
-            text: 'URLを更新しました',
+            text: 'URLを更新しました!',
           };
         }
         return {
           type: 'text',
-          text: 'はじめからやりなおしてください',
+          text: 'メッセージの形式が正しくないようです！もう一度やりなおしてください！！',
         };
       }
       case 'delete': {
@@ -178,12 +178,12 @@ export const textEvent = async (event, client) => {
           });
           return {
             type: 'text',
-            text: 'レコードを削除しました',
+            text: 'レコードを削除しました！',
           };
         }
         return {
           type: 'text',
-          text: 'はじめからやりなおしてください',
+          text: 'メッセージの形式が正しくないようです！もう一度やりなおしてください！！',
         };
       }
       case 'add': {
@@ -193,13 +193,13 @@ export const textEvent = async (event, client) => {
         });
         return {
           type: 'text',
-          text: 'タスクを追加しました',
+          text: 'タスクを追加しました！',
         };
       }
       case 'commentreview': {
         const lectureCodeCriteria = 8;
-        const buf = await displayCommentList(event.message.text);
-        if (buf !== '' && event.message.text.length <= lectureCodeCriteria) {
+        const [buf, length] = await displayCommentList(event.message.text);
+        if (buf !== '' && event.message.text.length <= lectureCodeCriteria && length !== 0) {
           return {
             type: 'text',
             text: `${buf}`,
@@ -207,7 +207,7 @@ export const textEvent = async (event, client) => {
         }
         return {
           type: 'text',
-          text: 'はじめからやりなおしてください',
+          text: 'まだコメントがありません！投稿してみましょう！！',
         };
       }
       default:

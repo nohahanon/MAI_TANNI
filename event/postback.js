@@ -1,5 +1,6 @@
 /* eslint-disable linebreak-style */
 import Pool from 'pg-pool';
+import line from '@line/bot-sdk';
 
 const pool = new Pool({
   user: process.env.pgUser,
@@ -9,7 +10,10 @@ const pool = new Pool({
   port: process.env.pgPort,
 });
 
-export const intervalExecute = async () => {
+const client = new line.Client({
+  channelAccessToken: process.env.channelAccessToken,
+});
+export const intervalExecute = async (event) => {
   const res = await pool.query({
     text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval \'7 day\';',
   });
@@ -18,10 +22,10 @@ export const intervalExecute = async () => {
   });
   let buf = '';
   for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
-  return {
+  client.pushMessage(event.source.userId, {
     type: 'text',
     text: `${buf}`,
-  };
+  });
 };
 
 function initContext(lineID) {
@@ -158,6 +162,9 @@ async function subFuncFlex(vls, idx, box) {
   if (vls.lecturecode.trim() !== 'MYTASK') {
     boxTmp.contents[1].text = `${resLectureName.rows[0].name}`;
   }
+  // if (resLectureName.rows.name !== undefined) {
+  //   boxTmp.contents[1].text = `${resLectureName.rows[0].name}`;
+  // }
   // console.log(boxTmp);
   // tar.push(boxTmp);
   return boxTmp;
