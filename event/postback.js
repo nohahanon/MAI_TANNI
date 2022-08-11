@@ -23,7 +23,7 @@ export const intervalExecute = async () => {
   for (let i = 0; i < res.rows.length; i += 1) {
     client.pushMessage(res.rows[i].lineid, {
       type: 'text',
-      text: `${res.rows[i].lecturecode.trim()}\n${res.rows[i].name}\n}`,
+      text: `以下のタスクが締め切り期限に近づきました！\n講義コード:${res.rows[i].lecturecode.trim()}\nタスク名:${res.rows[i].name}`,
     });
   }
 };
