@@ -11,10 +11,7 @@ const pool = new Pool({
 
 export const intervalExecute = async () => {
   const res = await pool.query({
-    text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval \'1 hour\';',
-  });
-  await pool.query({
-    text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval \'5 hour\';',
+    text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() + \'1 hour\' AND now() + interval \'2 hour\' OR deadline BETWEEN now() + interval \'5 hour\' AND now() + interval \'6 hour\';',
   });
   pool.query({
     text: 'DELETE FROM submissions WHERE deadline < now();',
