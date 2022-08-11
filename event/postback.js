@@ -13,20 +13,19 @@ const pool = new Pool({
 const client = new line.Client({
   channelAccessToken: process.env.channelAccessToken,
 });
-export const intervalExecute = async (event) => {
-  console.log(event.source.userId);
+export const intervalExecute = async () => {
   const res = await pool.query({
     text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() + \'1 hour\' AND now() + interval \'2 hour\' OR deadline BETWEEN now() + interval \'5 hour\' AND now() + interval \'6 hour\';',
   });
   pool.query({
     text: 'DELETE FROM submissions WHERE deadline < now();',
   });
-  let buf = '';
-  for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
-  client.pushMessage(event.source.userId, {
-    type: 'text',
-    text: `${buf}`,
-  });
+  for (let i = 0; i < res.rows.length; i += 1) {
+    client.pushMessage(res.rows[i].lineid, {
+      type: 'text',
+      text: `${res.rows[i].lecturecode.trim()}\n${res.rows[i].name}\n}`,
+    });
+  }
 };
 
 function initContext(lineID) {
