@@ -14,6 +14,7 @@ const client = new line.Client({
   channelAccessToken: process.env.channelAccessToken,
 });
 export const intervalExecute = async (event) => {
+  console.log(event.source.userId);
   const res = await pool.query({
     text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval \'7 day\';',
   });
