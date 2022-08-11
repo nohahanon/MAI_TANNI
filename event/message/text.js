@@ -106,7 +106,6 @@ export const textEvent = async (event, client) => {
           && Number.isInteger(Number.parseInt(data[1], 10))
           && data[1] <= 5
           && data[1] >= 0) {
-          console.log(data);
           pool.query({
             text: 'UPDATE reviews SET (comment, evaluationscore) = ($1, $2) WHERE reviewid = $3',
             values:
