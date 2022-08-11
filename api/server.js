@@ -19,7 +19,7 @@ app.post('/webhook', middleware({
 
 app.get('/interval-execute', (req, res) => {
   console.log('正しく叩けているよ!!!\n');
-  res.send('正しく叩けているよ！\n');
+  intervalExecute();
 });
 
 app.listen(PORT);
