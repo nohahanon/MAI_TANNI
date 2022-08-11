@@ -9,24 +9,20 @@ const pool = new Pool({
   port: process.env.pgPort,
 });
 
-async function repeatSelect() {
+export const intervalExecute = async () => {
   const res = await pool.query({
     text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() AND now() + interval \'7 day\';',
   });
-  console.log(res);
+  pool.query({
+    text: 'DELETE FROM submissions WHERE deadline < now();',
+  });
   let buf = '';
   for (let i = 1; i <= res.rows.length; i += 1)buf += `${i}: ${res.rows[i - 1].lecturecode.trim()}\n${res.rows[i - 1].name}\n`;
   return {
     type: 'text',
     text: `${buf}`,
   };
-}
-
-function repeatDelete() {
-  pool.query({
-    text: 'DELETE FROM submissions WHERE deadline < now();',
-  });
-}
+};
 
 function initContext(lineID) {
   pool.query({
@@ -374,14 +370,6 @@ const tmp = async (postbackData, lineID) => {
   let message;
 
   switch (postbackData) {
-    case '定期表示': {
-      message = await repeatSelect();
-      break;
-    }
-    case '定期削除': {
-      repeatDelete();
-      break;
-    }
     case 'リスト取得': {
       if ((await numOfSubmissions(lineID)) === '0') {
         return {
@@ -1058,7 +1046,6 @@ const tmp = async (postbackData, lineID) => {
       break;
     }
 
-    // "wrap": true, でtextを自動改行できます
     case 'リスト取得HELP': {
       message = {
         type: 'flex',
