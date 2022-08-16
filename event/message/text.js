@@ -18,15 +18,6 @@ function initContext(lineID) {
   });
 }
 
-function convertZuluToJST(zulu) {
-  const date = JSON.stringify(zulu).split('T');
-  const date1 = date[0].slice(1);
-  const date2 = date[1].split('.')[0];
-  const date3 = date2.split(':');
-  const date4 = (Number(JSON.stringify(date3[0]).slice(1, -1)) + 9) % 24;
-  return `${date1} ${date4}:${date3[1]}:${date3[2]}`;
-}
-
 // urlからicsデータを取得しdbにinsertする関数
 async function processCalender(url, lineID) {
   try {
@@ -36,11 +27,12 @@ async function processCalender(url, lineID) {
     // insert処理
     // db(submissionsとUsersLectures)の更新
     for (let i = 0; i < data.length; i += 1) {
+      const deadline = JSON.stringify(data[i].end).replace('"', '');
       // submissionの更新
       if (data[i].categories !== undefined) {
         pool.query({
           text: 'INSERT INTO submissions (lectureCode, deadline, name, lineID) VALUES ($1, TO_TIMESTAMP($2, $3), $4, $5);',
-          values: [data[i].categories[0].split('_')[0], convertZuluToJST(data[i].end), 'YYYY-MM-DD T1:MI:SS', data[i].summary, lineID],
+          values: [data[i].categories[0].split('_')[0], deadline.replace('T', ' '), 'YYYY/MM/DD HH24:MI:SS', data[i].summary, lineID],
         });
         // userslecturesの更新
         // 知らない組み合わせを得たら更新する
@@ -48,17 +40,12 @@ async function processCalender(url, lineID) {
           text: 'INSERT INTO UsersLectures SELECT $1, $2 WHERE NOT EXISTS (SELECT * FROM UsersLectures WHERE lineID = $1 AND lectureCode = $2)',
           values: [lineID, data[i].categories[0].split('_')[0]],
         });
-      } else {
-        pool.query({
-          text: 'INSERT INTO submissions (lectureCode, deadline, name, lineID) VALUES ($1, TO_TIMESTAMP($2, $3), $4, $5);',
-          values: ['MYTASK', convertZuluToJST(data[i].end), 'YYYY-MM-DD T1:MI:SS', data[i].summary, lineID],
-        });
       }
     }
   } catch (err) { console.log(err); }
 }
 
-async function displayCommentList(lectureid) {
+async function lecturesCommentList(lectureid) {
   const res = await pool.query({
     text: 'SELECT comment FROM reviews WHERE lecturecode = $1',
     values: [lectureid],
@@ -83,20 +70,99 @@ export const textEvent = async (event, client) => {
     switch (await context.rows[0].context) {
       case 'commentdelete': {
         const data = event.message.text.trim();
+        console.log(Number.parseInt(data, 10));
         if (!Number.isNaN(Number.parseInt(data, 10))) {
           pool.query({
             text: 'DELETE FROM reviews WHERE reviewid = $1;',
             values: [Number.parseInt(data, 10)],
           });
-          return {
+          return [{
             type: 'text',
             text: '指定したタスクを削除しました！',
-          };
+          }, {
+            type: 'flex',
+            altText: 'flex',
+            contents: {
+              type: 'bubble',
+              size: 'mega',
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'コメント削除を続けますか？',
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'はい',
+                          data: 'reviewsにdeleteする処理はじめ',
+                        },
+                      },
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'いいえ',
+                          data: '削除の終了',
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          }];
         }
-        return {
+        return [{
           type: 'text',
           text: '形式が誤っているようです！はじめからやりなおしてください！',
-        };
+        }, {
+          type: 'flex',
+          altText: 'flex',
+          contents: {
+            type: 'bubble',
+            size: 'mega',
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'コメント削除を続けますか？',
+                },
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    {
+                      type: 'button',
+                      action: {
+                        type: 'postback',
+                        label: 'はい',
+                        data: 'reviewsにdeleteする処理はじめ',
+                      },
+                    },
+                    {
+                      type: 'button',
+                      action: {
+                        type: 'postback',
+                        label: 'いいえ',
+                        data: '削除の終了',
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }];
       }
       case 'commentupdata': {
         const data = event.message.text.trim().split(' ');
@@ -106,20 +172,101 @@ export const textEvent = async (event, client) => {
           && Number.isInteger(Number.parseInt(data[1], 10))
           && data[1] <= 5
           && data[1] >= 0) {
+          // console.log(data[2]);
+          // console.log(Number.parseInt(data[1], 10));
+          // console.log(Number.parseInt(data[0], 10));
           pool.query({
             text: 'UPDATE reviews SET (comment, evaluationscore) = ($1, $2) WHERE reviewid = $3',
             values:
               [data[2], Number.parseInt(data[1], 10), Number.parseInt(data[0], 10)],
           });
-          return {
+          return [{
             type: 'text',
             text: '指定した投稿を更新しました！',
-          };
+          }, {
+            type: 'flex',
+            altText: 'flex',
+            contents: {
+              type: 'bubble',
+              size: 'mega',
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'コメント編集を続けますか？',
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'はい',
+                          data: 'reviewsにupdateする処理はじめ',
+                        },
+                      },
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'いいえ',
+                          data: '編集の終了',
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          }];
         }
-        return {
+        return [{
           type: 'text',
           text: '形式が誤っているようです！もう一度やり直してください！',
-        };
+        }, {
+          type: 'flex',
+          altText: 'flex',
+          contents: {
+            type: 'bubble',
+            size: 'mega',
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'コメント編集を続けますか？',
+                },
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    {
+                      type: 'button',
+                      action: {
+                        type: 'postback',
+                        label: 'はい',
+                        data: 'reviewsにupdateする処理はじめ',
+                      },
+                    },
+                    {
+                      type: 'button',
+                      action: {
+                        type: 'postback',
+                        label: 'いいえ',
+                        data: '編集の終了',
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }];
       }
       case 'commentpush': {
         try {
@@ -133,24 +280,104 @@ export const textEvent = async (event, client) => {
               text: 'INSERT INTO reviews (userid, comment, lecturecode, evaluationscore) VALUES ($1, $3, $2, $4);',
               values: [lineID, data[0], data[1], data[2]],
             });
-            return {
+            return [{
               type: 'text',
               text: '講義への評価を追加しました！',
-            };
+            }, {
+              type: 'flex',
+              altText: 'felx',
+              contents: {
+                type: 'bubble',
+                size: 'mega',
+                body: {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'コメントの投稿を続けますか？',
+                    },
+                    {
+                      type: 'box',
+                      layout: 'horizontal',
+                      contents: [
+                        {
+                          type: 'button',
+                          action: {
+                            type: 'postback',
+                            label: 'はい',
+                            data: 'reviewsにinsertする処理はじめ',
+                          },
+                        },
+                        {
+                          type: 'button',
+                          action: {
+                            type: 'postback',
+                            label: 'いいえ',
+                            data: '投稿の終了',
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            }];
           }
-          return {
+        } catch {
+          return [{
             type: 'text',
             text: '一つの講義に対して一つの投稿しかできません！別の講義について書くか、修正機能で追記しましょう！',
-          };
-        } catch (err) {
-          return {
-            type: 'text',
-            text: '一つの講義に対して一つの投稿しかできません！別の講義について書くか、修正機能で追記しましょう！',
-          };
+          }, {
+            type: 'flex',
+            altText: 'felx',
+            contents: {
+              type: 'bubble',
+              size: 'mega',
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'コメントの投稿を続けますか？',
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'はい',
+                          data: 'reviewsにinsertする処理はじめ',
+                        },
+                      },
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'いいえ',
+                          data: '投稿の終了',
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          }];
         }
+        break;
       }
       case 'push': {
-        if (urlSample.test(event.message.text)) {
+        const nowUrl = await pool.query({
+          text: 'SELECT url FROM users WHERE lineid = $1;',
+          values: [lineID],
+        });
+        // 正しいURLかつURLが何も登録されていない場合処理する
+        if (urlSample.test(event.message.text) && nowUrl.rows[0].url === null) {
           pool.query({
             text: 'UPDATE users SET url = $1 WHERE lineID = $2;',
             values: [event.message.text, lineID],
@@ -158,27 +385,26 @@ export const textEvent = async (event, client) => {
           processCalender(event.message.text, lineID);
           return {
             type: 'text',
-            text: 'URLを更新しました!',
+            text: 'URLを登録しました!タスクを自動追加しました！',
           };
         }
-        return {
-          type: 'text',
-          text: 'メッセージの形式が正しくないようです！もう一度やりなおしてください！！',
-        };
-      }
-      case 'delete': {
-        if (!Number.isNaN(event.message.text)) {
-          pool.query({
-            text: 'DELETE FROM submissions WHERE submissionid = (SELECT submissionid FROM submissions WHERE lineid = $1 LIMIT 1 OFFSET $2);',
-            values: [lineID, event.message.text - 1],
-          });
-          pool.query({
-            text: 'UPDATE users SET context = null WHERE lineid = $1;',
-            values: [lineID],
-          });
+        // 同じURLが記録されていたら終了
+        if (nowUrl.rows[0].url.trim() === event.message.text.trim()) {
           return {
             type: 'text',
-            text: 'レコードを削除しました！',
+            text: '既に同じURLが登録されているようです!',
+          };
+        }
+        // URLが保存されていたら自分で登録したもの以外を一度全て削除したのちinsertし直す
+        if (nowUrl.rows[0].url !== null) {
+          pool.query({
+            text: 'DELETE FROM submissions WHERE lineid = $1 AND lecturecode != $2;',
+            values: [lineID, 'MYTASK'],
+          });
+          processCalender(event.message.text, lineID);
+          return {
+            type: 'text',
+            text: 'URLを更新しました!タスクを自動更新しました!',
           };
         }
         return {
@@ -191,24 +417,141 @@ export const textEvent = async (event, client) => {
           text: 'INSERT INTO submissions (lectureCode, deadline, name, lineid) VALUES ($1, CURRENT_TIMESTAMP + \'7 day\', $2, $3);',
           values: ['MYTASK', event.message.text, lineID],
         });
-        return {
+        return [{
           type: 'text',
           text: 'タスクを追加しました！',
-        };
+        }, {
+          type: 'flex',
+          altText: 'flex',
+          contents: {
+            type: 'bubble',
+            size: 'mega',
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'タスクの追加を続けますか？',
+                },
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    {
+                      type: 'button',
+                      action: {
+                        type: 'postback',
+                        label: 'はい',
+                        data: '項目追加',
+                      },
+                    },
+                    {
+                      type: 'button',
+                      action: {
+                        type: 'postback',
+                        label: 'いいえ',
+                        data: '項目追加の終了',
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }];
       }
       case 'commentreview': {
         const lectureCodeCriteria = 8;
-        const [buf, length] = await displayCommentList(event.message.text);
+        const [buf, length] = await lecturesCommentList(event.message.text);
         if (buf !== '' && event.message.text.length <= lectureCodeCriteria && length !== 0) {
-          return {
+          return [{
             type: 'text',
             text: `${buf}`,
-          };
+          }, {
+            type: 'flex',
+            altText: 'flex',
+            contents: {
+              type: 'bubble',
+              size: 'mega',
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'コメントレビューを続けますか？',
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'はい',
+                          data: 'reviewsからselectする処理はじめ',
+                        },
+                      },
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'いいえ',
+                          data: 'レビューの終了',
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          }];
         }
-        return {
+        return [{
           type: 'text',
           text: 'まだコメントがありません！投稿してみましょう！！',
-        };
+        }, {
+          type: 'flex',
+          altText: 'flex',
+          contents: {
+            type: 'bubble',
+            size: 'mega',
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'コメントレビューを続けますか？',
+                },
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    {
+                      type: 'button',
+                      action: {
+                        type: 'postback',
+                        label: 'はい',
+                        data: 'reviewsからselectする処理はじめ',
+                      },
+                    },
+                    {
+                      type: 'button',
+                      action: {
+                        type: 'postback',
+                        label: 'いいえ',
+                        data: 'レビューの終了',
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }];
       }
       default:
         break;
@@ -222,6 +565,24 @@ export const textEvent = async (event, client) => {
   let message;
   // メッセージのテキストごとに条件分岐
   switch (event.message.text) {
+    case 'createTable': {
+      pool.query({
+        text: 'CREATE TABLE UsersLectures(lineID CHAR(100),lectureCode CHAR(100),UNIQUE(lineID,lectureCode));',
+      });
+      pool.query({
+        text: 'CREATE TABLE Submissions(submissionID SERIAL,lectureCode CHAR(100) NOT NULL,deadline timestamp NOT NULL,name VARCHAR(100) NOT NULL,lineID CHAR(100) NOT NULL);',
+      });
+      pool.query({
+        text: 'CREATE TABLE Users(lineID CHAR(100) PRIMARY KEY,context VARCHAR(100),url CHAR(250));',
+      });
+      pool.query({
+        text: 'CREATE TABLE reviews(reviewid SERIAL,userid CHAR(100) NOT NULL,comment VARCHAR(200) NOT NULL,lecturecode CHAR(100) NOT NULL,evaluationscore SMALLINT NOT NULL,UNIQUE(userid, lecturecode));',
+      });
+      pool.query({
+        text: 'CREATE TABLE Lectures(name VARCHAR(100) NOT NULL,code CHAR(100) NOT NULL,UNIQUE(code),CONSTRAINT pk_L PRIMARY KEY (code));',
+      });
+      break;
+    }
     case 'DBTest': {
       const now = pool.query({
         text: 'SELECT NOW();',

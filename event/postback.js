@@ -22,8 +22,39 @@ export const intervalExecute = async () => {
   });
   for (let i = 0; i < res.rows.length; i += 1) {
     client.pushMessage(res.rows[i].lineid, {
-      type: 'text',
-      text: `以下のタスクが締め切り期限に近づきました！\n講義コード:${res.rows[i].lecturecode.trim()}\nタスク名:${res.rows[i].name}`,
+      type: 'flex',
+      altText: 'Flex Message',
+      contents: {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: '以下のタスクが締め切り期限に近づきました！\n',
+              wrap: true,
+              size: 'xl',
+            },
+          ],
+          backgroundColor: '#f0fff0',
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: `講義コード:${res.rows[i].lecturecode.trim()}\nタスク名:${res.rows[i].name}`,
+              wrap: true,
+            },
+          ],
+          offsetTop: 'none',
+          offsetBottom: 'none',
+          paddingAll: 'lg',
+          paddingTop: 'lg',
+        },
+      },
     });
   }
 };
@@ -43,7 +74,7 @@ async function numOfSubmissions(lineID) {
   return res.rows[0].count;
 }
 
-async function numOfComments(lineID) {
+async function nunmOfMyComments(lineID) {
   const res = await pool.query({
     text: 'SELECT COUNT(*) FROM reviews WHERE userid = $1',
     values: [lineID],
@@ -51,7 +82,7 @@ async function numOfComments(lineID) {
   return res.rows[0].count;
 }
 
-async function displayLecturesList() {
+async function lecturesList() {
   const res = await pool.query({
     text: 'SELECT * FROM lectures;',
   });
@@ -139,7 +170,7 @@ async function displayLecturesList() {
   }];
 }
 
-// displaySubmissionListFlex()のためにオブジェクトに格納する文字列を成型します
+// mySubmissionList()のためにオブジェクトに格納する文字列を成型します
 async function subFuncFlex(vls, idx, box) {
   const hankakuCriteria = 25;
   const zenkakuCriteria = 15;
@@ -166,12 +197,12 @@ async function subFuncFlex(vls, idx, box) {
 }
 
 // lineidをもとにsubmissionテーブルからタスクを取得してflex messageのcontentsに収まるオブジェクトを返します
-async function displaySubmissionListFlex(lineID) {
+async function mySubmissionList(lineID) {
   const resMyTask = await pool.query({
     text: 'SELECT name, lecturecode FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\'',
     values: [lineID],
   });
-  const resOther = await pool.query({
+  const resLectures = await pool.query({
     text: 'SELECT name, lecturecode FROM submissions WHERE lineID = $1 AND lecturecode != \'MYTASK\'',
     values: [lineID],
   });
@@ -253,12 +284,174 @@ async function displaySubmissionListFlex(lineID) {
   ).concat(
     [separator],
   ).concat(
-    resOther.rows.map((t, i) => subFuncFlex(t, i + resMyTask.rows.length, boxForLecture)),
+    resLectures.rows.map((t, i) => subFuncFlex(t, i + resMyTask.rows.length, boxForLecture)),
   ));
   return model;
 }
 
-async function displayCommentListFlex(lineID) {
+async function subFuncFlexForDelete(vls, i, btn) {
+  const hankakuCriteria = 25;
+  const zenkakuCriteria = 15;
+  const btnTmp = JSON.parse(JSON.stringify(btn));
+  const resLectureName = await pool.query({
+    text: 'SELECT name FROM lectures WHERE code = $1;',
+    values: [vls.lecturecode.trim()],
+  });
+  const zenOrHan = /^[^\x01-\x7E\uFF61-\uFF9F]+$/;
+  // 文字列がzenkakuCriteria以上の長さの全角文字列の場合抑える
+  // 文字列がhankakuCriteria以上の長さの半角文字列の場合抑える
+  if (zenOrHan.test(vls.name) && vls.name.length > zenkakuCriteria) {
+    btnTmp.action.label = `${i + 1}:${vls.name.substr(0, zenkakuCriteria)}...`;
+  } else if (!zenOrHan.test(vls.name) && vls.name.length > hankakuCriteria) {
+    btnTmp.action.label = `${i + 1}:${vls.name.substr(0, hankakuCriteria)}...`;
+  } else {
+    btnTmp.action.label = `${i + 1}:${vls.name}`;
+  }
+  // if (vls.lecturecode.trim() !== 'MYTASK') {
+  //   btnTmp.contents[1].text = `${resLectureName.rows[0].name}`;
+  // }
+  btnTmp.action.data = vls.submissionid;
+
+  return btnTmp;
+}
+
+async function mySubmissionListForDelete(lineID) {
+  const resMyTask = await pool.query({
+    text: 'SELECT name, lecturecode, submissionid FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\'',
+    values: [lineID],
+  });
+  const resLectures = await pool.query({
+    text: 'SELECT name, lecturecode, submissionid FROM submissions WHERE lineID = $1 AND lecturecode != \'MYTASK\'',
+    values: [lineID],
+  });
+  // lecturesを参照してcodeをnameに置き換える。
+  const model = {
+    type: 'bubble',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        {
+          type: 'text',
+          text: 'TODO List',
+          weight: 'bold',
+          color: '#1DB446',
+          size: 'sm',
+        },
+        {
+          type: 'box',
+          layout: 'vertical',
+          margin: 'xxl',
+          spacing: 'sm',
+          contents: [],
+        },
+        {
+          type: 'separator',
+          margin: 'xxl',
+        },
+      ],
+    },
+    styles: {
+      footer: {
+        separator: true,
+      },
+    },
+  };
+  const separator = {
+    type: 'separator',
+    margin: 'xxl',
+  };
+  const boxForLecture = {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      {
+        type: 'text',
+        text: '',
+        size: 'xs',
+        color: '#555555',
+        flex: 0,
+        wrap: true,
+      },
+      {
+        type: 'text',
+        text: '',
+        size: 'xxs',
+        color: '#111111',
+        wrap: true,
+        align: 'end',
+      },
+    ],
+  };
+  const boxForMyTask = {
+    type: 'box',
+    layout: 'horizontal',
+    contents: [
+      {
+        type: 'text',
+        text: '',
+        size: 'xs',
+        color: '#555555',
+        wrap: true,
+        flex: 0,
+      },
+    ],
+  };
+
+  const tmpmodel = {
+    type: 'bubble',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        {
+          type: 'text',
+          text: 'TODO List',
+          weight: 'bold',
+          color: '#1DB446',
+          size: 'sm',
+        },
+        {
+          type: 'box',
+          layout: 'vertical',
+          margin: 'xxl',
+          spacing: 'sm',
+          contents: [],
+        },
+        {
+          type: 'separator',
+          margin: 'xxl',
+        },
+      ],
+    },
+    styles: {
+      footer: {
+        separator: true,
+      },
+    },
+  };
+  const btn = {
+    type: 'button',
+    action: {
+      type: 'postback',
+      label: '',
+      data: '',
+    },
+    // height: 'sm',
+    // margin: 'none',
+  };
+
+  model.body.contents[1].contents = await Promise.all([].concat(
+    resMyTask.rows.map((t, i) => subFuncFlexForDelete(t, i, btn)),
+  ).concat(
+    [separator],
+  ).concat(
+    resLectures.rows.map((t, i) => subFuncFlexForDelete(t, i + resMyTask.rows.length, btn)),
+  ));
+  return model;
+}
+
+async function myCommentList(lineID) {
   const res = await pool.query({
     text: 'SELECT reviewid, comment, evaluationscore, lecturecode FROM reviews WHERE userid = $1',
     values: [lineID],
@@ -409,6 +602,78 @@ async function displayCommentListFlex(lineID) {
 }
 
 const tmp = async (postbackData, lineID) => {
+  const context = await pool.query({
+    text: 'SELECT context FROM users WHERE lineID = $1;',
+    values: [lineID],
+  });
+
+  try {
+    switch (await context.rows[0].context) {
+      case 'delete': {
+        console.log(postbackData);
+        if (!Number.isNaN(Number.parseInt(postbackData, 10))) {
+          pool.query({
+            text: 'DELETE FROM submissions WHERE submissionid = $1;',
+            values: [Number.parseInt(postbackData, 10)],
+          });
+          return [{
+            type: 'text',
+            text: 'レコードを削除しました！',
+          }, {
+            type: 'flex',
+            altText: 'flex',
+            contents: {
+              type: 'bubble',
+              size: 'mega',
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'タスクの削除を続けますか？',
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'はい',
+                          data: '項目削除',
+                        },
+                      },
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'いいえ',
+                          data: '項目削除の終了',
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          }];
+        }
+        return {
+          type: 'text',
+          text: '削除機能を終了します！',
+        };
+      }
+      default:
+        break;
+    }
+  } catch (err) {
+    console.log(err);
+  } finally {
+    initContext(lineID);
+  }
+
   let message;
 
   switch (postbackData) {
@@ -422,7 +687,7 @@ const tmp = async (postbackData, lineID) => {
       message = {
         type: 'flex',
         altText: 'Flex Message',
-        contents: await displaySubmissionListFlex(lineID),
+        contents: await mySubmissionList(lineID),
       };
       break;
     }
@@ -432,15 +697,19 @@ const tmp = async (postbackData, lineID) => {
         type: 'text',
         text: '追加するタスクを送信してください',
       };
-      try {
-        pool.query({
-          text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
-          values: ['add', lineID],
-        });
-      } catch (err) {
-        console.log(err);
-        initContext(lineID);
-      }
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['add', lineID],
+      });
+      break;
+    }
+
+    case '項目追加の終了': {
+      message = {
+        type: 'text',
+        text: '追加機能を終了します！',
+      };
+      initContext(lineID);
       break;
     }
 
@@ -458,32 +727,35 @@ const tmp = async (postbackData, lineID) => {
     }
 
     case '項目削除': {
-      try {
-        if ((await numOfSubmissions(lineID)) === '0') {
-          return {
-            type: 'text',
-            text: 'レコードが存在しません',
-          };
-        }
-        message = [
-          {
-            type: 'flex',
-            altText: 'Flex Message',
-            contents: await displaySubmissionListFlex(lineID),
-          },
-          {
-            type: 'text',
-            text: '削除したいレコード番号を指定してください',
-          }];
-        console.log(message);
-        pool.query({
-          text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
-          values: ['delete', lineID],
-        });
-      } catch (err) {
-        console.log(err);
-        initContext(lineID);
+      if ((await numOfSubmissions(lineID)) === '0') {
+        return {
+          type: 'text',
+          text: 'レコードが存在しないようです！',
+        };
       }
+      message = [
+        {
+          type: 'flex',
+          altText: 'Flex Message',
+          contents: await mySubmissionListForDelete(lineID),
+        },
+        {
+          type: 'text',
+          text: '削除したい項目をタップしてください!',
+        }];
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['delete', lineID],
+      });
+      break;
+    }
+
+    case '項目削除の終了': {
+      message = {
+        type: 'text',
+        text: '削除機能を終了します！',
+      };
+      initContext(lineID);
       break;
     }
 
@@ -657,55 +929,43 @@ const tmp = async (postbackData, lineID) => {
         type: 'flex',
         altText: 'Flex Message',
         contents: {
-          type: 'carousel',
-          contents: [
-            {
-              type: 'bubble',
-              size: 'giga',
-              header: {
-                type: 'box',
-                layout: 'vertical',
-                contents: [
-                  {
-                    type: 'text',
-                    text: 'github',
-                    color: '#000000',
-                    align: 'start',
-                    size: 'xl',
-                    gravity: 'center',
-                  },
-                ],
-                backgroundColor: '#f0fff0',
-                paddingTop: '19px',
-                paddingAll: '12px',
-                paddingBottom: '16px',
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'github リポジトリ',
+                size: 'xxl',
+                color: '#000000',
               },
-              body: {
-                type: 'box',
-                layout: 'vertical',
-                contents: [
-                  {
-                    type: 'button',
-                    action: {
-                      type: 'uri',
-                      label: 'link',
-                      uri: 'https://github.com/Riku58/MAI-TANNI/?openExternalBrowser=1',
-                    },
-                    style: 'secondary',
-                    color: '#cccccc',
-                  },
-                ],
-                spacing: 'md',
-                paddingAll: '12px',
+              {
+                type: 'text',
+                text: 'リポジトリのページに遷移します',
+                wrap: true,
+                color: '#222222',
               },
-              styles: {
-                footer: {
-                  separator: false,
+            ],
+            margin: 'none',
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'uri',
+                  label: 'https://github.com/Riku58/MAI-TANNI',
+                  uri: 'https://github.com/Riku58/MAI-TANNI',
                 },
+                height: 'sm',
               },
-            },
-          ],
-        }, // ここの{}をFlexMessage Simulatorで生成されたコードに置き換える
+            ],
+          },
+        },
       };
       break;
     }
@@ -932,8 +1192,44 @@ const tmp = async (postbackData, lineID) => {
       break;
     }
 
+    case 'レビューの終了': {
+      message = {
+        type: 'text',
+        text: 'レビューを終了します！',
+      };
+      initContext(lineID);
+      break;
+    }
+
+    case '投稿の終了': {
+      message = {
+        type: 'text',
+        text: '投稿機能を終了します！',
+      };
+      initContext(lineID);
+      break;
+    }
+
+    case '編集の終了': {
+      message = {
+        type: 'text',
+        text: '編集機能を終了します！',
+      };
+      initContext(lineID);
+      break;
+    }
+
+    case '削除の終了': {
+      message = {
+        type: 'text',
+        text: '削除機能を終了します！',
+      };
+      initContext(lineID);
+      break;
+    }
+
     case 'reviewsからselectする処理はじめ': {
-      const res = await displayLecturesList();
+      const res = await lecturesList();
       pool.query({
         text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
         values: ['commentreview', lineID],
@@ -945,7 +1241,7 @@ const tmp = async (postbackData, lineID) => {
       return res;
     }
     case 'reviewsにinsertする処理はじめ': {
-      const res = await displayLecturesList();
+      const res = await lecturesList();
       pool.query({
         text: 'UPDATE users SET context = $1 WHERE lineid = $2',
         values: ['commentpush', lineID],
@@ -957,7 +1253,7 @@ const tmp = async (postbackData, lineID) => {
       return res;
     }
     case 'reviewsにupdateする処理はじめ': {
-      if ((await numOfComments(lineID)) === '0') {
+      if ((await nunmOfMyComments(lineID)) === '0') {
         return {
           type: 'text',
           text: 'あなたが投稿したコメントは存在しないようです',
@@ -970,16 +1266,16 @@ const tmp = async (postbackData, lineID) => {
       message = [{
         type: 'flex',
         altText: 'Flex Message',
-        contents: await displayCommentListFlex(lineID),
+        contents: await myCommentList(lineID),
       },
       {
         type: 'text',
-        text: 'どのコメントを修正しますか。以下の形式で送信してください。\n形式: コメント番号 評価スコア(0~5) コメント\n例1: 1 本質的に明らかに楽しい 5',
+        text: 'どのコメントを修正しますか。以下の形式で送信してください。\n形式: コメント番号 評価スコア(0~5) コメント\n例1: 1 5 本質的に明らかに楽しい',
       }];
       return message;
     }
     case 'reviewsにdeleteする処理はじめ': {
-      if ((await numOfComments(lineID)) === '0') {
+      if ((await nunmOfMyComments(lineID)) === '0') {
         return {
           type: 'text',
           text: 'あなたが投稿したコメントは存在しないようです',
@@ -992,7 +1288,7 @@ const tmp = async (postbackData, lineID) => {
       message = [{
         type: 'flex',
         altText: 'Flex Message',
-        contents: await displayCommentListFlex(lineID),
+        contents: await myCommentList(lineID),
       },
       {
         type: 'text',
