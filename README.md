@@ -1,3 +1,19 @@
+# プロダクト説明
+「MAI-TANNI!!!」は単位収得支援BOTです。
+
+## 機能説明
+1. lmsのカレンダーと連携した課題のリマインダー: 一度カレンダーURLを登録していただくと、定期的に課題を通知します。
+2. 講義の口コミを見る: 皆さんが自由に講義に対する感想などを投稿/閲覧/編集/削除(自分の投稿に限る)することができます。
+
+## チームメンバーとメンターの方々の紹介
+[火狐さん](https://github.com/Riku58)
+
+[neco;さん](https://github.com/neco75)
+
+[sou7さん](https://github.com/soukouki)
+
+[しんぶんぶんさん](https://github.com/shinbunbun)
+
 # AizuHack LINEBot勉強会
 
 こんにちは、会津大学学部一年のしんぶんぶんです。
