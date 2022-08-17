@@ -13,49 +13,37 @@ const pool = new Pool({
 const client = new line.Client({
   channelAccessToken: process.env.channelAccessToken,
 });
-export const intervalExecute = async () => {
+export const intervalExecute1 = async () => {
   const res = await pool.query({
-    text: 'SELECT * FROM submissions WHERE deadline BETWEEN now() + \'1 hour\' AND now() + interval \'2 hour\' OR deadline BETWEEN now() + interval \'5 hour\' AND now() + interval \'6 hour\';',
+    text: 'select * from submissions where deadline between now() + cast(\'1 hour\' as interval) and now() + cast(\'2 hours\' as interval);',
   });
   pool.query({
     text: 'DELETE FROM submissions WHERE deadline < now();',
   });
-  for (let i = 0; i < res.rows.length; i += 1) {
-    client.pushMessage(res.rows[i].lineid, {
-      type: 'flex',
-      altText: 'Flex Message',
-      contents: {
-        type: 'bubble',
-        header: {
-          type: 'box',
-          layout: 'vertical',
-          contents: [
-            {
-              type: 'text',
-              text: '以下のタスクが締め切り期限に近づきました！\n',
-              wrap: true,
-              size: 'xl',
-            },
-          ],
-          backgroundColor: '#f0fff0',
-        },
-        body: {
-          type: 'box',
-          layout: 'vertical',
-          contents: [
-            {
-              type: 'text',
-              text: `講義コード:${res.rows[i].lecturecode.trim()}\nタスク名:${res.rows[i].name}`,
-              wrap: true,
-            },
-          ],
-          offsetTop: 'none',
-          offsetBottom: 'none',
-          paddingAll: 'lg',
-          paddingTop: 'lg',
-        },
-      },
-    });
+  if (res.rows.length !== 0) {
+    for (let i = 0; i < res.rows.length; i += 1) {
+      client.pushMessage(res.rows[i].lineid, {
+        type: 'text',
+        text: `以下のタスクの締め切りがとても近づいています！！\n${res.rows[i].name}`,
+      });
+    }
+  }
+};
+
+export const intervalExecute2 = async () => {
+  const res = await pool.query({
+    text: 'select * from submissions where deadline between now() + cast(\'5 hour\' as interval) and now() + cast(\'6 hours\' as interval);',
+  });
+  pool.query({
+    text: 'DELETE FROM submissions WHERE deadline < now();',
+  });
+  if (res.rows.length !== 0) {
+    for (let i = 0; i < res.rows.length; i += 1) {
+      client.pushMessage(res.rows[i].lineid, {
+        type: 'text',
+        text: `以下のタスクの締め切りがそこそこ近づいています！！\n${res.rows[i].name}`,
+      });
+    }
   }
 };
 
@@ -437,7 +425,7 @@ async function mySubmissionListForDelete(lineID) {
       label: '',
       data: '',
     },
-    // height: 'sm',
+    height: 'sm',
     // margin: 'none',
   };
 
