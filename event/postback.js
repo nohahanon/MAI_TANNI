@@ -1,6 +1,7 @@
 /* eslint-disable linebreak-style */
 import Pool from 'pg-pool';
 import line from '@line/bot-sdk';
+import { processCalender } from './message/text.js';
 
 const pool = new Pool({
   user: process.env.pgUser,
@@ -13,38 +14,44 @@ const pool = new Pool({
 const client = new line.Client({
   channelAccessToken: process.env.channelAccessToken,
 });
-export const intervalExecute1 = async () => {
-  const res = await pool.query({
-    text: 'select * from submissions where deadline between now() + cast(\'1 hour\' as interval) and now() + cast(\'2 hours\' as interval);',
+export const intervalExecute = async () => {
+  // 現在時刻から1-2時間範囲にあるレコードを取得
+  const resReallyRecent = await pool.query({
+    text: 'select name, deadline, lecturecode, lineid from submissions where deadline between now() + cast(\'1 hour\' as interval) and now() + cast(\'2 hours\' as interval);',
   });
+  // // 現在時刻から5-6時間範囲にあるレコードを取得
+  const resRecent = await pool.query({
+    text: 'select name, deadline, lecturecode, lineid from submissions where deadline between now() + cast(\'5 hour\' as interval) and now() + cast(\'6 hours\' as interval);',
+  });
+  const resUsers = await pool.query({
+    text: 'SELECT lineid, url FROM users;',
+  });
+  // res_reallyrecent, resRecentの通知
+  await resReallyRecent.rows.forEach((t) => {
+    if (t.lecturecode.trim() !== 'MYTASK') {
+      client.pushMessage(t.lineid.trim(), {
+        type: 'text',
+        text: `以下のタスクの締め切りがとても近づいています！！\n${t.name.trim()}:${t.lectureCode.trim()}`,
+      });
+    }
+  });
+  await resRecent.rows.forEach((t) => {
+    if (t.lecturecode.trim() !== 'MYTASK') {
+      client.pushMessage(t.lineid.trim(), {
+        type: 'text',
+        text: `以下のタスクの締め切りがそこそこ近づいています！！\nタスク名:${t.name.trim()}\n講義名:${t.lectureCode.trim()}`,
+      });
+    }
+  });
+  // users全員のsubmission更新
+  await resUsers.rows.forEach((t) => {
+    console.log(t);
+    processCalender(t.url, t.lineid);
+  });
+  // 期限が切れたレコードの削除
   pool.query({
     text: 'DELETE FROM submissions WHERE deadline < now();',
   });
-  if (res.rows.length !== 0) {
-    for (let i = 0; i < res.rows.length; i += 1) {
-      client.pushMessage(res.rows[i].lineid, {
-        type: 'text',
-        text: `以下のタスクの締め切りがとても近づいています！！\n${res.rows[i].name}`,
-      });
-    }
-  }
-};
-
-export const intervalExecute2 = async () => {
-  const res = await pool.query({
-    text: 'select * from submissions where deadline between now() + cast(\'5 hour\' as interval) and now() + cast(\'6 hours\' as interval);',
-  });
-  pool.query({
-    text: 'DELETE FROM submissions WHERE deadline < now();',
-  });
-  if (res.rows.length !== 0) {
-    for (let i = 0; i < res.rows.length; i += 1) {
-      client.pushMessage(res.rows[i].lineid, {
-        type: 'text',
-        text: `以下のタスクの締め切りがそこそこ近づいています！！\n${res.rows[i].name}`,
-      });
-    }
-  }
 };
 
 function initContext(lineID) {
@@ -930,7 +937,7 @@ const tmp = async (postbackData, lineID) => {
               },
               {
                 type: 'text',
-                text: 'リポジトリのページに遷移します',
+                text: 'リポジトリのページに遷移します。ぜひPRをお願いします!!!',
                 wrap: true,
                 color: '#222222',
               },
