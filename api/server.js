@@ -6,7 +6,7 @@ import cron from 'node-cron';
 
 // ファイルの読み込み
 import { index } from '../bot.js';
-import { intervalExecute } from '../event/postback.js';
+import { intervalExecute, client } from '../event/postback.js';
 
 const PORT = process.env.PORT || 3000;
 const app = express();

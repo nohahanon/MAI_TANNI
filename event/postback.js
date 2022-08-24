@@ -11,7 +11,7 @@ const pool = new Pool({
   port: process.env.pgPort,
 });
 
-const client = new line.Client({
+export const client = new line.Client({
   channelAccessToken: process.env.channelAccessToken,
 });
 export const intervalExecute = async () => {
@@ -26,12 +26,17 @@ export const intervalExecute = async () => {
   const resUsers = await pool.query({
     text: 'SELECT lineid, url FROM users;',
   });
+  // console.log(await resReallyRecent);
   // res_reallyrecent, resRecentの通知
   await resReallyRecent.rows.forEach((t) => {
     if (t.lecturecode.trim() !== 'MYTASK') {
+      // console.log(t.name);
+      // console.log(t.deadline);
+      // console.log(t.lecturecode);
+      // console.log(t.lineid);
       client.pushMessage(t.lineid.trim(), {
         type: 'text',
-        text: `以下のタスクの締め切りがとても近づいています！！\n${t.name.trim()}:${t.lectureCode.trim()}`,
+        text: `以下のタスクの締め切りがとても近づいています！！\nタスク名:${t.name.trim()}\n講義名:${t.lecturecode.trim()}`,
       });
     }
   });
@@ -39,13 +44,12 @@ export const intervalExecute = async () => {
     if (t.lecturecode.trim() !== 'MYTASK') {
       client.pushMessage(t.lineid.trim(), {
         type: 'text',
-        text: `以下のタスクの締め切りがそこそこ近づいています！！\nタスク名:${t.name.trim()}\n講義名:${t.lectureCode.trim()}`,
+        text: `以下のタスクの締め切りがそこそこ近づいています！！\nタスク名:${t.name.trim()}\n講義名:${t.lecturecode.trim()}`,
       });
     }
   });
   // users全員のsubmission更新
   await resUsers.rows.forEach((t) => {
-    console.log(t);
     processCalender(t.url, t.lineid);
   });
   // 期限が切れたレコードの削除
