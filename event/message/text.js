@@ -31,12 +31,8 @@ export const processCalender = async function processCalender(url, lineID) {
       // submissionの更新
       if (data[i].categories !== undefined) {
         pool.query({
-          text: 'DELETE FROM submissions WHERE name = $1 AND lineid = $2;',
-          values: [data[i].summary, lineID],
-        });
-        pool.query({
-          text: 'INSERT INTO submissions (lectureCode, deadline, name, lineID) VALUES ($1, TO_TIMESTAMP($2, $3), $4, $5);',
-          values: [data[i].categories[0].split('_')[0], deadline.replace('T', ' '), 'YYYY/MM/DD HH24:MI:SS', data[i].summary, lineID],
+          text: 'INSERT INTO submissions SELECT nextval($1), $2, TO_TIMESTAMP($3, $4), $5, $6 WHERE NOT EXISTS (SELECT * FROM submissions WHERE lineid = $ AND name = $);',
+          values: ['submissions_submissionid_seq', data[i].categories[0].split('_')[0], deadline.replace('T', ' '), 'YYYY/MM/DD HH24:MI:SS', data[i].summary, lineID],
         });
         // userslecturesの更新
         // 知らない組み合わせを得たら更新する
@@ -47,7 +43,7 @@ export const processCalender = async function processCalender(url, lineID) {
       }
     }
   } catch (err) { console.log(err); }
-}
+};
 
 async function lecturesCommentList(lectureid) {
   const res = await pool.query({

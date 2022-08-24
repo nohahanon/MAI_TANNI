@@ -26,6 +26,7 @@ app.get('/interval-execute', (req, res) => {
 app.listen(PORT);
 console.log(`Server running at ${PORT}`);
 
+// ローカルでの定期実行のテスト用
 // cron.schedule('* * * * *', () => {
 //   intervalExecute();
 // });
