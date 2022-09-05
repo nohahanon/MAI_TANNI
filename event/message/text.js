@@ -17,6 +17,12 @@ function initContext(lineID) {
     values: [lineID],
   });
 }
+function initContextNumber(lineID) {
+  pool.query({
+    text: 'UPDATE users SET contextNumber = null WHERE lineid = $1;',
+    values: [lineID],
+  });
+}
 
 // urlからicsデータを取得しdbにinsertする関数
 export const processCalender = async function processCalender(url, lineID) {
@@ -64,10 +70,26 @@ export const textEvent = async (event, client) => {
     text: 'SELECT context FROM users WHERE lineID = $1;',
     values: [lineID],
   });
+  const contextNumber = await pool.query({
+    text: 'SELECT contextNumber FROM users WHERE lineID = $1;',
+    values: [lineID],
+  });
 
   const urlSample = /^https:\/\/elms.u-aizu.ac.jp\/calendar\/export_execute.php\?userid\=/;
   try {
     switch (await context.rows[0].context) {
+      case 'addHitokoto': {
+        pool.query({
+          text: 'UPDATE submissions SET comment = $1 WHERE submissionid = $2;',
+          values: [event.message.text, contextNumber.rows[0].contextnumber],
+        });
+        initContext(lineID);
+        initContextNumber(lineID);
+        return {
+          type: 'text',
+          text: 'ひとことを追加しました！',
+        };
+      }
       case 'commentdelete': {
         const data = event.message.text.trim();
         console.log(Number.parseInt(data, 10));

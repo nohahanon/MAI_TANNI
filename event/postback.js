@@ -166,8 +166,16 @@ async function lecturesList() {
 
 // mySubmissionList()のためにオブジェクトに格納する文字列を成型します
 async function subFuncFlex(vls, idx, box) {
-  const hankakuCriteria = 25;
-  const zenkakuCriteria = 15;
+  const hitokotoText = {
+    type: 'text',
+    text: '',
+    size: 'xs',
+    color: '#555555',
+    flex: 0,
+    wrap: true,
+  };
+  const hankakuCriteria = 30;
+  const zenkakuCriteria = 20;
   const boxTmp = JSON.parse(JSON.stringify(box));
   const resLectureName = await pool.query({
     text: 'SELECT name FROM lectures WHERE code = $1;',
@@ -177,15 +185,19 @@ async function subFuncFlex(vls, idx, box) {
   // 文字列がzenkakuCriteria以上の長さの全角文字列の場合抑える
   // 文字列がhankakuCriteria以上の長さの半角文字列の場合抑える
   if (zenOrHan.test(vls.name) && vls.name.length > zenkakuCriteria) {
-    boxTmp.contents[0].text = `${idx + 1}:${vls.name.substr(0, zenkakuCriteria)}...`;
+    boxTmp.contents[0].contents[0].text = `${idx + 1}:${vls.name.substr(0, zenkakuCriteria)}...`;
   } else if (!zenOrHan.test(vls.name) && vls.name.length > hankakuCriteria) {
-    boxTmp.contents[0].text = `${idx + 1}:${vls.name.substr(0, hankakuCriteria)}...`;
+    boxTmp.contents[0].contents[0].text = `${idx + 1}:${vls.name.substr(0, hankakuCriteria)}...`;
   } else {
-    boxTmp.contents[0].text = `${idx + 1}:${vls.name}`;
+    boxTmp.contents[0].contents[0].text = `${idx + 1}:${vls.name}`;
   }
-  // lecturecodeが'MYTASK'の場合lecturesに聞いても何も返らないため、''を自力で代入する
+  // lecturecodeが'MYTASK'の場合lecturesに聞いても何も返らない
   if (vls.lecturecode.trim() !== 'MYTASK') {
-    boxTmp.contents[1].text = `${resLectureName.rows[0].name}`;
+    boxTmp.contents[0].contents[1].text = `${resLectureName.rows[0].name}`;
+  }
+  if (vls.comment !== null) {
+    hitokotoText.text = `>>${vls.comment}`;
+    boxTmp.contents.push(hitokotoText);
   }
   return boxTmp;
 }
@@ -193,16 +205,17 @@ async function subFuncFlex(vls, idx, box) {
 // lineidをもとにsubmissionテーブルからタスクを取得してflex messageのcontentsに収まるオブジェクトを返します
 async function mySubmissionList(lineID) {
   const resMyTask = await pool.query({
-    text: 'SELECT name, lecturecode FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\'',
+    text: 'SELECT submissionid, name, lecturecode, comment FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\'',
     values: [lineID],
   });
   const resLectures = await pool.query({
-    text: 'SELECT name, lecturecode FROM submissions WHERE lineID = $1 AND lecturecode != \'MYTASK\'',
+    text: 'SELECT submissionid, name, lecturecode, comment FROM submissions WHERE lineID = $1 AND lecturecode != \'MYTASK\'',
     values: [lineID],
   });
   // lecturesを参照してcodeをnameに置き換える。
   const model = {
     type: 'bubble',
+    size: 'giga',
     body: {
       type: 'box',
       layout: 'vertical',
@@ -239,37 +252,49 @@ async function mySubmissionList(lineID) {
   };
   const boxForLecture = {
     type: 'box',
-    layout: 'horizontal',
+    layout: 'vertical',
     contents: [
       {
-        type: 'text',
-        text: '',
-        size: 'xs',
-        color: '#555555',
-        flex: 0,
-        wrap: true,
-      },
-      {
-        type: 'text',
-        text: '',
-        size: 'xxs',
-        color: '#111111',
-        wrap: true,
-        align: 'end',
+        type: 'box',
+        layout: 'horizontal',
+        contents: [
+          {
+            type: 'text',
+            text: '',
+            size: 'xs',
+            color: '#555555',
+            flex: 0,
+            wrap: true,
+          },
+          {
+            type: 'text',
+            text: '',
+            size: 'xxs',
+            color: '#111111',
+            wrap: true,
+            align: 'end',
+          },
+        ],
       },
     ],
   };
   const boxForMyTask = {
     type: 'box',
-    layout: 'horizontal',
+    layout: 'vertical',
     contents: [
       {
-        type: 'text',
-        text: '',
-        size: 'xs',
-        color: '#555555',
-        wrap: true,
-        flex: 0,
+        type: 'box',
+        layout: 'horizontal',
+        contents: [
+          {
+            type: 'text',
+            text: '',
+            size: 'xs',
+            color: '#555555',
+            flex: 0,
+            wrap: true,
+          },
+        ],
       },
     ],
   };
@@ -309,7 +334,7 @@ async function subFuncFlexForDelete(vls, i, btn) {
   return btnTmp;
 }
 
-async function mySubmissionListForDelete(lineID) {
+async function mySubmissionListWithButton(lineID) {
   const resMyTask = await pool.query({
     text: 'SELECT name, lecturecode, submissionid FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\'',
     values: [lineID],
@@ -604,12 +629,12 @@ const tmp = async (postbackData, lineID) => {
   try {
     switch (await context.rows[0].context) {
       case 'delete': {
-        console.log(postbackData);
         if (!Number.isNaN(Number.parseInt(postbackData, 10))) {
           pool.query({
             text: 'DELETE FROM submissions WHERE submissionid = $1;',
             values: [Number.parseInt(postbackData, 10)],
           });
+          initContext(lineID);
           return [{
             type: 'text',
             text: 'レコードを削除しました！',
@@ -654,9 +679,26 @@ const tmp = async (postbackData, lineID) => {
             },
           }];
         }
+        initContext(lineID);
         return {
           type: 'text',
           text: '削除機能を終了します！',
+        };
+      }
+      case 'addHitokoto': {
+        if (!Number.isNaN(Number.parseInt(postbackData, 10))) {
+          pool.query({
+            text: 'UPDATE users SET contextNumber = $1 WHERE lineid = $2;',
+            values: [Number.parseInt(postbackData, 10), lineID],
+          });
+          return {
+            type: 'text',
+            text: '添えたい一言を送信してください！',
+          };
+        }
+        return {
+          type: 'text',
+          text: 'エラーが発生しました！最初からやりなおしてください！',
         };
       }
       default:
@@ -664,13 +706,35 @@ const tmp = async (postbackData, lineID) => {
     }
   } catch (err) {
     console.log(err);
-  } finally {
-    initContext(lineID);
   }
 
   let message;
 
   switch (postbackData) {
+    case 'ひとこと追加': {
+      if ((await numOfSubmissions(lineID)) === '0') {
+        return {
+          type: 'text',
+          text: 'レコードが存在しないようです！',
+        };
+      }
+      message = [
+        {
+          type: 'flex',
+          altText: 'Flex Message',
+          contents: await mySubmissionListWithButton(lineID),
+        },
+        {
+          type: 'text',
+          text: 'ひとことを追加したい項目をタップしてください!',
+        }];
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['addHitokoto', lineID],
+      });
+      break;
+    }
+
     case 'リスト取得': {
       if ((await numOfSubmissions(lineID)) === '0') {
         return {
@@ -731,7 +795,7 @@ const tmp = async (postbackData, lineID) => {
         {
           type: 'flex',
           altText: 'Flex Message',
-          contents: await mySubmissionListForDelete(lineID),
+          contents: await mySubmissionListWithButton(lineID),
         },
         {
           type: 'text',
@@ -802,8 +866,8 @@ const tmp = async (postbackData, lineID) => {
                 type: 'button',
                 action: {
                   type: 'postback',
-                  label: '開発中！',
-                  data: '開発中1',
+                  label: 'タスクにひとこと添える',
+                  data: 'ひとこと追加',
                 },
                 height: 'sm',
               },
