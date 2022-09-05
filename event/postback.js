@@ -26,14 +26,9 @@ export const intervalExecute = async () => {
   const resUsers = await pool.query({
     text: 'SELECT lineid, url FROM users;',
   });
-  // console.log(await resReallyRecent);
-  // res_reallyrecent, resRecentの通知
+  // resReallyRecent, resRecentの通知
   await resReallyRecent.rows.forEach((t) => {
     if (t.lecturecode.trim() !== 'MYTASK') {
-      // console.log(t.name);
-      // console.log(t.deadline);
-      // console.log(t.lecturecode);
-      // console.log(t.lineid);
       client.pushMessage(t.lineid.trim(), {
         type: 'text',
         text: `以下のタスクの締め切りがとても近づいています！！\nタスク名:${t.name.trim()}\n講義名:${t.lecturecode.trim()}`,
@@ -292,10 +287,10 @@ async function subFuncFlexForDelete(vls, i, btn) {
   const hankakuCriteria = 25;
   const zenkakuCriteria = 15;
   const btnTmp = JSON.parse(JSON.stringify(btn));
-  const resLectureName = await pool.query({
-    text: 'SELECT name FROM lectures WHERE code = $1;',
-    values: [vls.lecturecode.trim()],
-  });
+  // const resLectureName = await pool.query({
+  //   text: 'SELECT name FROM lectures WHERE code = $1;',
+  //   values: [vls.lecturecode.trim()],
+  // });
   const zenOrHan = /^[^\x01-\x7E\uFF61-\uFF9F]+$/;
   // 文字列がzenkakuCriteria以上の長さの全角文字列の場合抑える
   // 文字列がhankakuCriteria以上の長さの半角文字列の場合抑える
@@ -360,75 +355,75 @@ async function mySubmissionListForDelete(lineID) {
     type: 'separator',
     margin: 'xxl',
   };
-  const boxForLecture = {
-    type: 'box',
-    layout: 'horizontal',
-    contents: [
-      {
-        type: 'text',
-        text: '',
-        size: 'xs',
-        color: '#555555',
-        flex: 0,
-        wrap: true,
-      },
-      {
-        type: 'text',
-        text: '',
-        size: 'xxs',
-        color: '#111111',
-        wrap: true,
-        align: 'end',
-      },
-    ],
-  };
-  const boxForMyTask = {
-    type: 'box',
-    layout: 'horizontal',
-    contents: [
-      {
-        type: 'text',
-        text: '',
-        size: 'xs',
-        color: '#555555',
-        wrap: true,
-        flex: 0,
-      },
-    ],
-  };
+  // const boxForLecture = {
+  //   type: 'box',
+  //   layout: 'horizontal',
+  //   contents: [
+  //     {
+  //       type: 'text',
+  //       text: '',
+  //       size: 'xs',
+  //       color: '#555555',
+  //       flex: 0,
+  //       wrap: true,
+  //     },
+  //     {
+  //       type: 'text',
+  //       text: '',
+  //       size: 'xxs',
+  //       color: '#111111',
+  //       wrap: true,
+  //       align: 'end',
+  //     },
+  //   ],
+  // };
+  // const boxForMyTask = {
+  //   type: 'box',
+  //   layout: 'horizontal',
+  //   contents: [
+  //     {
+  //       type: 'text',
+  //       text: '',
+  //       size: 'xs',
+  //       color: '#555555',
+  //       wrap: true,
+  //       flex: 0,
+  //     },
+  //   ],
+  // };
 
-  const tmpmodel = {
-    type: 'bubble',
-    body: {
-      type: 'box',
-      layout: 'vertical',
-      contents: [
-        {
-          type: 'text',
-          text: 'TODO List',
-          weight: 'bold',
-          color: '#1DB446',
-          size: 'sm',
-        },
-        {
-          type: 'box',
-          layout: 'vertical',
-          margin: 'xxl',
-          spacing: 'sm',
-          contents: [],
-        },
-        {
-          type: 'separator',
-          margin: 'xxl',
-        },
-      ],
-    },
-    styles: {
-      footer: {
-        separator: true,
-      },
-    },
-  };
+  // const tmpmodel = {
+  //   type: 'bubble',
+  //   body: {
+  //     type: 'box',
+  //     layout: 'vertical',
+  //     contents: [
+  //       {
+  //         type: 'text',
+  //         text: 'TODO List',
+  //         weight: 'bold',
+  //         color: '#1DB446',
+  //         size: 'sm',
+  //       },
+  //       {
+  //         type: 'box',
+  //         layout: 'vertical',
+  //         margin: 'xxl',
+  //         spacing: 'sm',
+  //         contents: [],
+  //       },
+  //       {
+  //         type: 'separator',
+  //         margin: 'xxl',
+  //       },
+  //     ],
+  //   },
+  //   styles: {
+  //     footer: {
+  //       separator: true,
+  //     },
+  //   },
+  // };
   const btn = {
     type: 'button',
     action: {
@@ -748,7 +743,13 @@ const tmp = async (postbackData, lineID) => {
       });
       break;
     }
-
+    case '項目修正': {
+      message = {
+        type: 'text',
+        text: '777',
+      };
+      break;
+    }
     case '項目削除の終了': {
       message = {
         type: 'text',
@@ -1382,7 +1383,6 @@ const tmp = async (postbackData, lineID) => {
       };
       break;
     }
-
     case 'リスト取得HELP': {
       message = {
         type: 'flex',
@@ -1682,6 +1682,12 @@ const tmp = async (postbackData, lineID) => {
           },
         },
       };
+      break;
+    }
+    case '共有': {
+      break;
+    }
+    case 'ミニゲーム': {
       break;
     }
     default: break;

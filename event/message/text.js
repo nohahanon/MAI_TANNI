@@ -570,7 +570,7 @@ export const textEvent = async (event, client) => {
         text: 'CREATE TABLE UsersLectures(lineID CHAR(100),lectureCode CHAR(100),UNIQUE(lineID,lectureCode));',
       });
       pool.query({
-        text: 'CREATE TABLE Submissions(submissionID SERIAL,lectureCode CHAR(100) NOT NULL,deadline timestamp NOT NULL,name VARCHAR(100) NOT NULL,lineID CHAR(100) NOT NULL);',
+        text: 'CREATE TABLE Submissions(submissionID SERIAL,lectureCode CHAR(100) NOT NULL,deadline timestamp NOT NULL,name VARCHAR(100) NOT NULL,lineID CHAR(100) NOT NULL, comment VARCHAR(100));',
       });
       pool.query({
         text: 'CREATE TABLE Users(lineID CHAR(100) PRIMARY KEY,context VARCHAR(100),url CHAR(250));',
