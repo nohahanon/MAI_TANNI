@@ -2,6 +2,7 @@
 import axios from 'axios';
 import ical from 'ical';
 import Pool from 'pg-pool';
+import { mySubmissionList } from '../postback.js';
 
 const pool = new Pool({
   user: process.env.pgUser,
@@ -78,6 +79,22 @@ export const textEvent = async (event, client) => {
   const urlSample = /^https:\/\/elms.u-aizu.ac.jp\/calendar\/export_execute.php\?userid\=/;
   try {
     switch (await context.rows[0].context) {
+      case 'updateHitokoto': {
+        await pool.query({
+          text: 'UPDATE submissions SET comment = $1 WHERE submissionid = $2;',
+          values: [event.message.text, contextNumber.rows[0].contextnumber],
+        });
+        initContext(lineID);
+        initContextNumber(lineID);
+        return [{
+          type: 'flex',
+          altText: 'Flex Message',
+          contents: await mySubmissionList(lineID),
+        }, {
+          type: 'text',
+          text: 'ひとことを修正しました！',
+        }];
+      }
       case 'addHitokoto': {
         pool.query({
           text: 'UPDATE submissions SET comment = $1 WHERE submissionid = $2;',
@@ -474,6 +491,62 @@ export const textEvent = async (event, client) => {
                         type: 'postback',
                         label: 'いいえ',
                         data: '項目追加の終了',
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }];
+      }
+      case 'update': {
+        await pool.query({
+          text: 'UPDATE submissions SET name = $1 WHERE submissionid = $2;',
+          values: [event.message.text, contextNumber.rows[0].contextnumber],
+        });
+        initContext(lineID);
+        initContextNumber(lineID);
+        return [{
+          type: 'flex',
+          altText: 'Flex Message',
+          contents: await mySubmissionList(lineID),
+        },
+        {
+          type: 'text',
+          text: 'タスク名を修正しました！',
+        }, {
+          type: 'flex',
+          altText: 'flex',
+          contents: {
+            type: 'bubble',
+            size: 'mega',
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'タスク名の修正を続けますか？',
+                },
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    {
+                      type: 'button',
+                      action: {
+                        type: 'postback',
+                        label: 'はい',
+                        data: '項目修正',
+                      },
+                    },
+                    {
+                      type: 'button',
+                      action: {
+                        type: 'postback',
+                        label: 'いいえ',
+                        data: '項目修正の終了',
                       },
                     },
                   ],

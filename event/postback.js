@@ -60,6 +60,13 @@ function initContext(lineID) {
   });
 }
 
+function initContextNumber(lineID) {
+  pool.query({
+    text: 'UPDATE users SET contextNumber = null WHERE lineid = $1;',
+    values: [lineID],
+  });
+}
+
 async function numOfSubmissions(lineID) {
   const res = await pool.query({
     text: 'SELECT COUNT(*) FROM submissions WHERE lineid = $1;',
@@ -203,13 +210,13 @@ async function subFuncFlex(vls, idx, box) {
 }
 
 // lineidをもとにsubmissionテーブルからタスクを取得してflex messageのcontentsに収まるオブジェクトを返します
-async function mySubmissionList(lineID) {
+export const mySubmissionList = async function mySubmissionList(lineID) {
   const resMyTask = await pool.query({
-    text: 'SELECT submissionid, name, lecturecode, comment FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\'',
+    text: 'SELECT submissionid, name, lecturecode, comment FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\' ORDER BY submissionid',
     values: [lineID],
   });
   const resLectures = await pool.query({
-    text: 'SELECT submissionid, name, lecturecode, comment FROM submissions WHERE lineID = $1 AND lecturecode != \'MYTASK\'',
+    text: 'SELECT submissionid, name, lecturecode, comment FROM submissions WHERE lineID = $1 AND lecturecode != \'MYTASK\' ORDER BY submissionid',
     values: [lineID],
   });
   // lecturesを参照してcodeをnameに置き換える。
@@ -306,7 +313,7 @@ async function mySubmissionList(lineID) {
     resLectures.rows.map((t, i) => subFuncFlex(t, i + resMyTask.rows.length, boxForLecture)),
   ));
   return model;
-}
+};
 
 async function subFuncFlexForDelete(vls, i, btn) {
   const hankakuCriteria = 25;
@@ -336,11 +343,11 @@ async function subFuncFlexForDelete(vls, i, btn) {
 
 async function mySubmissionListWithButton(lineID) {
   const resMyTask = await pool.query({
-    text: 'SELECT name, lecturecode, submissionid FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\'',
+    text: 'SELECT name, lecturecode, submissionid FROM submissions WHERE lineID = $1 AND lecturecode = \'MYTASK\' ORDER BY submissionid',
     values: [lineID],
   });
   const resLectures = await pool.query({
-    text: 'SELECT name, lecturecode, submissionid FROM submissions WHERE lineID = $1 AND lecturecode != \'MYTASK\'',
+    text: 'SELECT name, lecturecode, submissionid FROM submissions WHERE lineID = $1 AND lecturecode != \'MYTASK\' ORDER BY submissionid',
     values: [lineID],
   });
   // lecturesを参照してcodeをnameに置き換える。
@@ -628,6 +635,29 @@ const tmp = async (postbackData, lineID) => {
 
   try {
     switch (await context.rows[0].context) {
+      case 'update': {
+        const res = await pool.query({
+          text: 'SELECT name FROM submissions WHERE submissionid = $1;',
+          values: [Number.parseInt(postbackData, 10)],
+        });
+        console.log(res);
+        if (!Number.isNaN(Number.parseInt(postbackData, 10)) && res.rows[0].name !== null) {
+          pool.query({
+            text: 'UPDATE users SET contextNumber = $1 WHERE lineid = $2;',
+            values: [Number.parseInt(postbackData, 10), lineID],
+          });
+          return {
+            type: 'text',
+            text: `現在のタスク名は\n\n${res.rows[0].name}\n\nです!\n新しいタスク名を送信してください!`,
+          };
+        }
+        initContextNumber(lineID);
+        initContext(lineID);
+        return {
+          type: 'text',
+          text: 'エラーが発生しました！最初からやりなおしてください！',
+        };
+      }
       case 'delete': {
         if (!Number.isNaN(Number.parseInt(postbackData, 10))) {
           pool.query({
@@ -696,6 +726,54 @@ const tmp = async (postbackData, lineID) => {
             text: '添えたい一言を送信してください！',
           };
         }
+        initContext(lineID);
+        return {
+          type: 'text',
+          text: 'エラーが発生しました！最初からやりなおしてください！',
+        };
+      }
+      case 'updateHitokoto': {
+        const res = await pool.query({
+          text: 'SELECT comment FROM submissions WHERE submissionid = $1;',
+          values: [Number.parseInt(postbackData, 10)],
+        });
+        if (!Number.isNaN(Number.parseInt(postbackData, 10)) && res.rows[0].comment !== null) {
+          pool.query({
+            text: 'UPDATE users SET contextNumber = $1 WHERE lineid = $2;',
+            values: [Number.parseInt(postbackData, 10), lineID],
+          });
+          return {
+            type: 'text',
+            text: `現在の一言は\n\n${res.rows[0].comment}\n\nです!\n新しい一言を送信してください!`,
+          };
+        }
+        initContextNumber(lineID);
+        initContext(lineID);
+        return {
+          type: 'text',
+          text: 'エラーが発生しました！最初からやりなおしてください！',
+        };
+      }
+      case 'deleteHitokoto': {
+        const res = await pool.query({
+          text: 'SELECT comment FROM submissions WHERE submissionid = $1;',
+          values: [Number.parseInt(postbackData, 10)],
+        });
+        if (!Number.isNaN(Number.parseInt(postbackData, 10)) && res.rows[0].comment !== null) {
+          pool.query({
+            text: 'UPDATE submissions SET comment = $1 WHERE submissionid = $2;',
+            values: [null, Number.parseInt(postbackData, 10)],
+          });
+          initContextNumber(lineID);
+          initContext(lineID);
+
+          return {
+            type: 'text',
+            text: '指定したタスクのひとことを削除しました!',
+          };
+        }
+        initContextNumber(lineID);
+        initContext(lineID);
         return {
           type: 'text',
           text: 'エラーが発生しました！最初からやりなおしてください！',
@@ -731,6 +809,58 @@ const tmp = async (postbackData, lineID) => {
       pool.query({
         text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
         values: ['addHitokoto', lineID],
+      });
+      break;
+    }
+
+    case 'ひとこと修正': {
+      if ((await numOfSubmissions(lineID)) === '0') {
+        return {
+          type: 'text',
+          text: 'レコードが存在しないようです！',
+        };
+      }
+      message = [{
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: await mySubmissionList(lineID),
+      },
+      {
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: await mySubmissionListWithButton(lineID),
+      },
+      {
+        type: 'text',
+        text: 'ひとことを修正したい項目をタップしてください!確認したい場合はメニュー1の一覧ボタンをタップしてください!',
+      }];
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['updateHitokoto', lineID],
+      });
+      break;
+    }
+
+    case 'ひとこと削除': {
+      if ((await numOfSubmissions(lineID)) === '0') {
+        return {
+          type: 'text',
+          text: 'レコードが存在しないようです！',
+        };
+      }
+      message = [
+        {
+          type: 'flex',
+          altText: 'Flex Message',
+          contents: await mySubmissionListWithButton(lineID),
+        },
+        {
+          type: 'text',
+          text: 'ひとことを削除したい項目をタップしてください!',
+        }];
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['deleteHitokoto', lineID],
       });
       break;
     }
@@ -808,10 +938,30 @@ const tmp = async (postbackData, lineID) => {
       break;
     }
     case '項目修正': {
-      message = {
+      if ((await numOfSubmissions(lineID)) === '0') {
+        return {
+          type: 'text',
+          text: 'レコードが存在しないようです！',
+        };
+      }
+      message = [{
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: await mySubmissionList(lineID),
+      },
+      {
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: await mySubmissionListWithButton(lineID),
+      },
+      {
         type: 'text',
-        text: '777',
-      };
+        text: '修正したいタスク名をタップしてください!',
+      }];
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['update', lineID],
+      });
       break;
     }
     case '項目削除の終了': {
@@ -820,6 +970,78 @@ const tmp = async (postbackData, lineID) => {
         text: '削除機能を終了します！',
       };
       initContext(lineID);
+      break;
+    }
+    case '項目修正の終了': {
+      message = {
+        type: 'text',
+        text: '修正機能を終了します！',
+      };
+      initContext(lineID);
+      initContextNumber(lineID);
+      break;
+    }
+    case 'ひとこと': {
+      message = {
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'ひとこと 機能一覧',
+                size: 'xxl',
+                color: '#000000',
+              },
+              {
+                type: 'text',
+                text: '使いたい機能の項目をタップしてください',
+                wrap: true,
+                color: '#222222',
+              },
+            ],
+            margin: 'none',
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'ひとこと追加',
+                  data: 'ひとこと追加',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'ひとこと修正',
+                  data: 'ひとこと修正',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'ひとこと削除',
+                  data: 'ひとこと削除',
+                },
+                height: 'sm',
+              },
+            ],
+          },
+        },
+      };
       break;
     }
 
@@ -866,8 +1088,8 @@ const tmp = async (postbackData, lineID) => {
                 type: 'button',
                 action: {
                   type: 'postback',
-                  label: 'タスクにひとこと添える',
-                  data: 'ひとこと追加',
+                  label: 'ひとこと',
+                  data: 'ひとこと',
                 },
                 height: 'sm',
               },
