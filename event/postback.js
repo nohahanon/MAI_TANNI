@@ -1097,8 +1097,8 @@ const tmp = async (postbackData, lineID) => {
                 type: 'button',
                 action: {
                   type: 'postback',
-                  label: '開発中！',
-                  data: '開発中2',
+                  label: 'フォルダ管理',
+                  data: 'フォルダ管理',
                 },
                 height: 'sm',
               },
@@ -1655,18 +1655,88 @@ const tmp = async (postbackData, lineID) => {
       };
       break;
     }
-    case '開発中1': {
+    case 'フォルダ管理': {
       message = {
-        type: 'text',
-        text: '実装をお待ちください!',
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'フォルダ管理 機能一覧',
+                size: 'xxl',
+                color: '#000000',
+              },
+              {
+                type: 'text',
+                text: '使いたい機能の項目をタップしてください',
+                wrap: true,
+                color: '#222222',
+              },
+            ],
+            margin: 'none',
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'フォルダ作成',
+                  data: 'フォルダ作成',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'フォルダ削除',
+                  data: 'フォルダ削除',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'フォルダ名称変更',
+                  data: 'フォルダ名称変更',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'タスク移動',
+                  data: 'タスク移動',
+                },
+                height: 'sm',
+              },
+            ],
+          },
+        },
       };
       break;
     }
-    case '開発中2': {
-      message = {
-        type: 'text',
-        text: '実装をお待ちください!',
-      };
+    case 'フォルダ作成': {
+      break;
+    }
+    case 'フォルダ削除': {
+      break;
+    }
+    case 'フォルダ名称変更': {
+      break;
+    }
+    case 'タスク移動': {
       break;
     }
     case 'リスト取得HELP': {
