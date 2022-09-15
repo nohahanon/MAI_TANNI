@@ -5,7 +5,7 @@ import 'dotenv/config';
 import cron from 'node-cron';
 
 // ファイルの読み込み
-import { index } from '../bot.js';
+import { index } from '../index.js';
 import { intervalExecute } from '../event/postback.js';
 
 const PORT = process.env.PORT || 3000;
