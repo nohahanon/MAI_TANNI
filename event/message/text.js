@@ -79,6 +79,22 @@ export const textEvent = async (event, client) => {
   const urlSample = /^https:\/\/elms.u-aizu.ac.jp\/calendar\/export_execute.php\?userid\=/;
   try {
     switch (await context.rows[0].context) {
+      case 'updatedir': {
+        await pool.query({
+          text: 'UPDATE directory SET dirname = $1 WHERE dirid = $2;',
+          values: [event.message.text, contextNumber.rows[0].contextnumber],
+        });
+        initContext(lineID);
+        initContextNumber(lineID);
+        return [{
+          type: 'flex',
+          altText: 'Flex Message',
+          contents: await mySubmissionList(lineID),
+        }, {
+          type: 'text',
+          text: 'フォルダ名を修正しました！',
+        }];
+      }
       case 'updateHitokoto': {
         await pool.query({
           text: 'UPDATE submissions SET comment = $1 WHERE submissionid = $2;',
@@ -648,6 +664,16 @@ export const textEvent = async (event, client) => {
           },
         }];
       }
+      case 'createdir': {
+        await pool.query({
+          text: 'INSERT INTO directory (dirname, userid) VALUES ($1, $2);',
+          values: [event.message.text, lineID],
+        });
+        return {
+          type: 'text',
+          text: `フォルダ"${event.message.text}"を作成しました！`,
+        };
+      }
       default:
         break;
     }
@@ -909,6 +935,7 @@ export const textEvent = async (event, client) => {
     case 'おはよう': {
       // 返信するメッセージを作成
       message = { type: 'text', text: 'おはよう' };
+      initContext(lineID);
       break;
     }
     // 'こんにちは'というメッセージが送られてきた時
