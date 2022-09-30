@@ -627,9 +627,77 @@ async function myCommentList(lineID) {
   return boxParent;
 }
 
+async function numOfDirectoryList(lineID) {
+  const myDirList = await pool.query({
+    text: 'SELECT * FROM directory WHERE userid = $1',
+    values: [lineID],
+  });
+  return myDirList.rows.length;
+}
+
+async function myDirectoryList(lineID) {
+  const myDirList = await pool.query({
+    text: 'SELECT dirid, dirname FROM directory WHERE userid = $1',
+    values: [lineID],
+  });
+  const btn = {
+    type: 'button',
+    action: {
+      type: 'postback',
+      label: '',
+      data: '',
+    },
+    height: 'sm',
+  };
+  const model = {
+    type: 'bubble',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        {
+          type: 'text',
+          text: 'Folder List',
+          weight: 'bold',
+          color: '#1DB446',
+          size: 'sm',
+        },
+        {
+          type: 'box',
+          layout: 'vertical',
+          margin: 'xxl',
+          spacing: 'sm',
+          contents: [],
+        },
+        {
+          type: 'separator',
+          margin: 'xxl',
+        },
+      ],
+    },
+    styles: {
+      footer: {
+        separator: true,
+      },
+    },
+  };
+  myDirList.rows.forEach((vls) => {
+    console.log(vls);
+    const btnTmp = JSON.parse(JSON.stringify(btn));
+    btnTmp.action.label = vls.dirname;
+    btnTmp.action.data = vls.dirid;
+    model.body.contents[1].contents.push(btnTmp);
+  });
+  return model;
+}
+
 const tmp = async (postbackData, lineID) => {
   const context = await pool.query({
     text: 'SELECT context FROM users WHERE lineID = $1;',
+    values: [lineID],
+  });
+  const contextNumber = await pool.query({
+    text: 'SELECT contextNumber FROM users WHERE lineID = $1;',
     values: [lineID],
   });
 
@@ -779,6 +847,158 @@ const tmp = async (postbackData, lineID) => {
           text: 'エラーが発生しました！最初からやりなおしてください！',
         };
       }
+      case 'deletedir': {
+        if (!Number.isNaN(Number.parseInt(postbackData, 10))) {
+          await pool.query({
+            text: 'DELETE FROM directory WHERE dirid = $1;',
+            values: [Number.parseInt(postbackData, 10)],
+          });
+          await pool.query({
+            text: 'DELETE FROM submissions WHERE dirid = $1;',
+            values: [Number.parseInt(postbackData, 10)],
+          });
+          initContext(lineID);
+          return [{
+            type: 'text',
+            text: 'フォルダを削除しました！',
+          }, {
+            type: 'flex',
+            altText: 'flex',
+            contents: {
+              type: 'bubble',
+              size: 'mega',
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'フォルダの削除を続けますか？',
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'はい',
+                          data: 'フォルダ削除',
+                        },
+                      },
+                      {
+                        type: 'button',
+                        action: {
+                          type: 'postback',
+                          label: 'いいえ',
+                          data: 'フォルダ削除の終了',
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          }];
+        }
+        initContext(lineID);
+        return {
+          type: 'text',
+          text: 'フォルダ削除機能を終了します！',
+        };
+      }
+      case 'updatedir': {
+        const res = await pool.query({
+          text: 'SELECT dirname FROM directory WHERE dirid = $1;',
+          values: [Number.parseInt(postbackData, 10)],
+        });
+        if (!Number.isNaN(Number.parseInt(postbackData, 10)) && res.rows[0].dirname !== null) {
+          pool.query({
+            text: 'UPDATE users SET contextNumber = $1 WHERE lineid = $2;',
+            values: [Number.parseInt(postbackData, 10), lineID],
+          });
+          return {
+            type: 'text',
+            text: `現在のフォルダ名は\n\n${res.rows[0].dirname}\n\nです!\n新しいフォルダ名を送信してください!`,
+          };
+        }
+        initContextNumber(lineID);
+        initContext(lineID);
+        return {
+          type: 'text',
+          text: 'エラーが発生しました！最初からやりなおしてください！',
+        };
+      }
+      case 'movetask1': {
+        const res1 = await pool.query({
+          text: 'SELECT dirid FROM submissions WHERE submissionid = $1;',
+          values: [Number.parseInt(postbackData, 10)],
+        });
+        pool.query({
+          text: 'UPDATE users SET contextNumber = $1 WHERE lineid = $2;',
+          values: [Number.parseInt(postbackData, 10), lineID],
+        });
+        pool.query({
+          text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+          values: ['movetask2', lineID],
+        });
+        if (!Number.isNaN(Number.parseInt(postbackData, 10))) {
+          if (res1.rows[0].dirid !== null) {
+            const res2 = await pool.query({
+              text: 'SELECT dirname FROM directory WHERE dirid = $1;',
+              values: [Number.parseInt(res1.rows[0].dirid, 10)],
+            });
+            return [{
+              type: 'flex',
+              altText: 'flex',
+              contents: await myDirectoryList(lineID),
+            },
+            {
+              type: 'text',
+              text: `現在のフォルダ名は\n\n${res2.rows[0].dirname}\n\nです!\n移動先のフォルダ名を選択してください!`,
+            }];
+          }
+          return [{
+            type: 'flex',
+            altText: 'flex',
+            contents: await myDirectoryList(lineID),
+          },
+          {
+            type: 'text',
+            text: '移動先のフォルダ名を選択してください!',
+          }];
+        }
+        initContextNumber(lineID);
+        initContext(lineID);
+        return {
+          type: 'text',
+          text: 'エラーが発生しました！最初からやりなおしてください！',
+        };
+      }
+      case 'movetask2': {
+        initContextNumber(lineID);
+        initContext(lineID);
+        if (!Number.isNaN(Number.parseInt(postbackData, 10))) {
+          await pool.query({
+            text: 'UPDATE submissions SET dirid = $1 WHERE submissionid = $2',
+            values: [Number.parseInt(postbackData, 10), contextNumber.rows[0].contextnumber],
+          });
+          return [{
+            type: 'flex',
+            altText: 'Flex Message',
+            contents: await mySubmissionList(lineID),
+          },
+          {
+            type: 'text',
+            text: 'タスクを指定のフォルダに移動しました！',
+          }];
+        }
+        return {
+          type: 'text',
+          text: 'エラーが発生しました！最初からやりなおしてください！',
+        };
+      }
       default:
         break;
     }
@@ -832,7 +1052,7 @@ const tmp = async (postbackData, lineID) => {
       },
       {
         type: 'text',
-        text: 'ひとことを修正したい項目をタップしてください!確認したい場合はメニュー1の一覧ボタンをタップしてください!',
+        text: 'ひとことを修正したい項目をタップしてください!!',
       }];
       pool.query({
         text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
@@ -1102,10 +1322,191 @@ const tmp = async (postbackData, lineID) => {
                 },
                 height: 'sm',
               },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'テスト用ボタン',
+                  data: 'テスト用case文だよー',
+                },
+                height: 'sm',
+              },
             ],
           },
         },
       };
+      break;
+    }
+
+    case 'フォルダ管理': {
+      message = {
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: 'フォルダ管理\n機能一覧',
+                size: 'xxl',
+                color: '#000000',
+              },
+              {
+                type: 'text',
+                text: '使いたい機能の項目をタップしてください',
+                wrap: true,
+                color: '#222222',
+              },
+            ],
+            margin: 'none',
+            backgroundColor: '#f0fff0',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'フォルダ作成',
+                  data: 'フォルダ作成',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'フォルダ名修正',
+                  data: 'フォルダ名修正',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'フォルダ削除',
+                  data: 'フォルダ削除',
+                },
+                height: 'sm',
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: 'タスク移動',
+                  data: 'タスク移動',
+                },
+                height: 'sm',
+              },
+            ],
+          },
+        },
+      };
+      break;
+    }
+
+    case 'フォルダ作成': {
+      message = {
+        type: 'text',
+        text: '作成したいフォルダの名称を送信してください！',
+      };
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['createdir', lineID],
+      });
+      break;
+    }
+
+    case 'フォルダ名修正': {
+      if ((await numOfDirectoryList(lineID)) === 0) {
+        return {
+          type: 'text',
+          text: 'フォルダが存在しないようです！',
+        };
+      }
+      message = [{
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: await mySubmissionList(lineID),
+      },
+      {
+        type: 'flex',
+        altText: 'Flex Message',
+        contents: await myDirectoryList(lineID),
+      },
+      {
+        type: 'text',
+        text: '修正したいフォルダをタップしてください!',
+      }];
+      pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['updatedir', lineID],
+      });
+      break;
+    }
+
+    case 'フォルダ削除': {
+      if ((await numOfDirectoryList(lineID)) === 0) {
+        return {
+          type: 'text',
+          text: 'フォルダが存在しないようです！',
+        };
+      }
+      message = [{
+        type: 'flex',
+        altText: 'flex',
+        contents: await myDirectoryList(lineID),
+      },
+      {
+        type: 'text',
+        text: '削除したいフォルダを選択してください',
+      }];
+      await pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['deletedir', lineID],
+      });
+      break;
+    }
+
+    case 'タスク移動': {
+      if ((await numOfDirectoryList(lineID)) === 0 || (await numOfSubmissions(lineID)) === '0') {
+        return {
+          type: 'text',
+          text: 'フォルダまたはタスクが存在しないようです！',
+        };
+      }
+      message = [{
+        type: 'flex',
+        altText: 'flex',
+        contents: await mySubmissionListWithButton(lineID),
+      },
+      {
+        type: 'text',
+        text: 'まず移動させたいタスクを選択してください',
+      }];
+      await pool.query({
+        text: 'UPDATE users SET context = $1 WHERE lineid = $2;',
+        values: ['movetask1', lineID],
+      });
+      break;
+    }
+
+    case 'フォルダ削除の終了': {
+      message = {
+        type: 'text',
+        text: 'フォルダ削除機能を終了します！',
+      };
+      initContext(lineID);
+      break;
+    }
+
+    case 'テスト用case文だよー': {
       break;
     }
 
@@ -1653,90 +2054,6 @@ const tmp = async (postbackData, lineID) => {
           },
         },
       };
-      break;
-    }
-    case 'フォルダ管理': {
-      message = {
-        type: 'flex',
-        altText: 'Flex Message',
-        contents: {
-          type: 'bubble',
-          header: {
-            type: 'box',
-            layout: 'vertical',
-            contents: [
-              {
-                type: 'text',
-                text: 'フォルダ管理 機能一覧',
-                size: 'xxl',
-                color: '#000000',
-              },
-              {
-                type: 'text',
-                text: '使いたい機能の項目をタップしてください',
-                wrap: true,
-                color: '#222222',
-              },
-            ],
-            margin: 'none',
-            backgroundColor: '#f0fff0',
-          },
-          body: {
-            type: 'box',
-            layout: 'vertical',
-            contents: [
-              {
-                type: 'button',
-                action: {
-                  type: 'postback',
-                  label: 'フォルダ作成',
-                  data: 'フォルダ作成',
-                },
-                height: 'sm',
-              },
-              {
-                type: 'button',
-                action: {
-                  type: 'postback',
-                  label: 'フォルダ削除',
-                  data: 'フォルダ削除',
-                },
-                height: 'sm',
-              },
-              {
-                type: 'button',
-                action: {
-                  type: 'postback',
-                  label: 'フォルダ名称変更',
-                  data: 'フォルダ名称変更',
-                },
-                height: 'sm',
-              },
-              {
-                type: 'button',
-                action: {
-                  type: 'postback',
-                  label: 'タスク移動',
-                  data: 'タスク移動',
-                },
-                height: 'sm',
-              },
-            ],
-          },
-        },
-      };
-      break;
-    }
-    case 'フォルダ作成': {
-      break;
-    }
-    case 'フォルダ削除': {
-      break;
-    }
-    case 'フォルダ名称変更': {
-      break;
-    }
-    case 'タスク移動': {
       break;
     }
     case 'リスト取得HELP': {
